@@ -11,6 +11,7 @@
     { label: 'Shop', href: '/dashboard/shop'},
     { label: 'Projects', href: '/dashboard/projects'},
     { label: 'Gallery', href: '/dashboard/gallery'},
+    { label: 'Settings', href: '/dashboard/settings'},
   ];
 </script>
 

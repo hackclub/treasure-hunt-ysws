@@ -5,6 +5,8 @@ import type { Item, Journey, Order, Reward, User, Submission, Project } from "./
 import { AIRTABLE_KEY, AIRTABLE_BASE_ID } from '$env/static/private';
 import { joinChannel, sendUpdateDM } from "$lib/server/slack/slackClient";
 import { completeJourney } from "$lib/rewards/complete";
+import { get } from "node:http";
+import { send } from "node:process";
 const base = new Airtable({ apiKey: AIRTABLE_KEY }).base(AIRTABLE_BASE_ID);
 
 // General get records
@@ -284,6 +286,47 @@ export function getItems(): Promise<Item[]> {
             reward: true,
         }
     ]);*///
+}
+
+// update user info
+export async function updateUserInfo(slackId: string, updatedInfo: Partial<{ firstName: string; lastName: string; address1: string; address2: string; city: string; state: string; zip: string; email: string; phone: string; country: string }>): Promise<void> {
+    let id: string = slackId;
+    const userRecord = await getUserRecords(slackId);
+    if (!userRecord) {
+        throw new Error("User not found");
+    }
+    return new Promise((resolve, reject) => {
+        getUserRecords(slackId).then(userRecord => {
+            if (!userRecord) {
+                reject(new Error("User not found"));
+                return;
+            }
+            const recordId = userRecord.id;
+            const fieldsToUpdate: Partial<{ firstName: string; lastName: string; address1: string; address2: string; city: string; state: string; zip: string; email: string; phone: string; country: string }> = {};
+            if (updatedInfo.firstName !== undefined) fieldsToUpdate.firstName = updatedInfo.firstName;
+            if (updatedInfo.lastName !== undefined) fieldsToUpdate.lastName = updatedInfo.lastName;
+            if (updatedInfo.address1 !== undefined) fieldsToUpdate.address1 = updatedInfo.address1;
+            if (updatedInfo.address2 !== undefined) fieldsToUpdate.address2 = updatedInfo.address2;
+            if (updatedInfo.city !== undefined) fieldsToUpdate.city = updatedInfo.city;
+            if (updatedInfo.state !== undefined) fieldsToUpdate.state = updatedInfo.state;
+            if (updatedInfo.zip !== undefined) fieldsToUpdate.zip = updatedInfo.zip;
+            if (updatedInfo.email !== undefined) fieldsToUpdate.email = updatedInfo.email;
+            if (updatedInfo.phone !== undefined) fieldsToUpdate.phone = updatedInfo.phone;
+            if (updatedInfo.country !== undefined) fieldsToUpdate.country = updatedInfo.country;
+            base("Users").update(recordId, fieldsToUpdate, (error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                sendUpdateDM(slackId, "Settings Updated", `✅ | Your settings have been updated successfully!`).catch(error => {
+                    console.error("Error sending update DM:", error);
+                });
+                resolve();
+            });
+        }).catch(error => {
+            reject(error);
+        });
+    });
 }
 
 // Is user functions
