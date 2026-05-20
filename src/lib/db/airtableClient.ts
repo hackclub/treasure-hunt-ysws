@@ -3,7 +3,7 @@ import type { AirtableFieldSet, AirtableRecord } from './airtable-types';
 const Airtable = AirtablePkg;
 import type { Item, Journey, Order, Reward, User, Submission, Project } from "./models";
 import { AIRTABLE_KEY, AIRTABLE_BASE_ID } from '$env/static/private';
-import { sendUpdateDM } from "$lib/server/slack/slackClient";
+import { joinChannel, sendUpdateDM } from "$lib/server/slack/slackClient";
 import { completeJourney } from "$lib/rewards/complete";
 const base = new Airtable({ apiKey: AIRTABLE_KEY }).base(AIRTABLE_BASE_ID);
 
@@ -341,6 +341,14 @@ export function addUser(user: User): Promise<void> {
         );
         sendUpdateDM(user.slackId, "Welcome to the Treasure Hunt!", `👋 | Hi ${user.firstName}! Welcome to the Treasure Hunt!\n You should complete 7 Journeys in 4 weeks!\n Each journey Will earn you a reward after 4 hours\nComplete more then 4 hours per journey? You can earn Goldbars to use in the shop!\n(8 Goldbars per hour after the 4 hours, and 10 per hours if you complete the journey within the theme).\n\nGood luck!`).catch(error => {
             console.error("Error sending welcome DM:", error);
+        });
+        // join into treasure-hunt-ysws
+        joinChannel(user.slackId, "C0APFPMDETD").catch(error => {
+            console.error("Error joining channel:", error);
+        });
+        // join into treasure-hunt-bulletbin
+        joinChannel(user.slackId, "C0B46EHJ830").catch(error => {
+            console.error("Error joining channel:", error);
         });
     });
 }

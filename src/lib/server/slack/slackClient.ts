@@ -85,3 +85,15 @@ export async function sendUpdateDM(slackId: string, title: string, message: stri
         console.error("Error sending DM:", error);
     }
 }
+
+export async function joinChannel(slackId: string, channelId: string) {
+    try {
+        const client = getSlackClient();
+        await client.client.conversations.invite({
+            channel: channelId,
+            users: slackId,
+        });
+    } catch (error) {
+        console.error("Error joining channel:", error);
+    }
+}
