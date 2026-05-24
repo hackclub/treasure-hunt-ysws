@@ -5,43 +5,60 @@
     import { preloadCode, preloadData } from '$app/navigation';
     import { onMount } from 'svelte';
 
+    let projects = $state([]);
+
     // preload dashboard
     onMount(() => {
         preloadData('/dashboard');
         preloadCode('/dashboard');
     });
-    const projects = [
-        {
-            id: "id1",
-            projectName: "Projehjkct 1",
-            description: "This is the first project.",
-            codeUrl: "https://github.com/hackclub/project1",
-            readmeUrl: "https://github.com/hackclub/project1/blob/main/README.md",
-            demoUrl: "https://project1.hackclub.com",
-            screenshot: "https://via.placeholder.com/150",
-            aiUsage: "Bla bla bla used bla bla",
-            hackatimeProject: "hackatime-project-1",
-            user: "U091DE0M4NB",
-            journeyNumber: 1,
-            type: "Web app",
-            status: "pending"
-        },
-        {
-            id: "id2",
-            projectName: "Projetrct 2",
-            description: "This is the second project.",
-            codeUrl: "https://github.com/hackclub/project2",
-            readmeUrl: "https://github.com/hackclub/project2/blob/main/README.md",
-            demoUrl: "https://project2.hackclub.com",
-            screenshot: "https://via.placeholder.com/150",
-            aiUsage: "Bla bla bla used bla bla",
-            hackatimeProject: "hackatime-project-2",
-            user: "U091DE0M4NB",
-            journeyNumber: 2,
-            type: "App",
-            status: "pending"
-        }
-    ];
+//    const projects = [
+//        {
+//            id: "id1",
+//            projectName: "Projehjkct 1",
+//            description: "This is the first project.",
+//            codeUrl: "https://github.com/hackclub/project1",
+//            readmeUrl: "https://github.com/hackclub/project1/blob/main/README.md",
+//            demoUrl: "https://project1.hackclub.com",
+//            screenshot: "https://via.placeholder.com/150",
+//            aiUsage: "Bla bla bla used bla bla",
+//            hackatimeProject: "hackatime-project-1",
+//            user: "U091DE0M4NB",
+//            journeyNumber: 1,
+//            type: "Web app",
+//            status: "pending"
+//        },
+//        {
+//            id: "id2",
+//            projectName: "Projetrct 2",
+//            description: "This is the second project.",
+//            codeUrl: "https://github.com/hackclub/project2",
+//            readmeUrl: "https://github.com/hackclub/project2/blob/main/README.md",
+//            demoUrl: "https://project2.hackclub.com",
+//            screenshot: "https://via.placeholder.com/150",
+//            aiUsage: "Bla bla bla used bla bla",
+//            hackatimeProject: "hackatime-project-2",
+//            user: "U091DE0M4NB",
+//            journeyNumber: 2,
+//            type: "App",
+//            status: "pending"
+//        }
+//    ];
+
+    onMount(() => {
+        let projectsRequest = fetch('/api/review/getPending')
+            .then(response => response.json())
+            .then(data => {
+                return data.projects;
+            })
+            .catch(error => {
+                console.error('Error fetching projects:', error);
+                return [];
+            });
+        projectsRequest.then(fetchedProjects => {
+            projects = fetchedProjects;
+        });
+    });
 
     function getProjectTypeList(projects) {
         const types = new Set();

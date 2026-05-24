@@ -755,7 +755,7 @@ export async function userRecordIdToSlackId(recordId: string): Promise<string | 
 }
 
 // Submittion workflow
-export async function sendProjectToReview(slackId: string, journeyNumber: number, HackatimeProjectName: string, screenshotUrl: string, description: string, githubUsername: string, codeUrl: string, playableUrl: string): Promise<string> {
+export async function sendProjectToReview(slackId: string, journeyNumber: number, HackatimeProjectName: string, screenshotUrl: string, description: string, aiUsage: string, githubUsername: string, codeUrl: string, readmeUrl: string, playableUrl: string): Promise<string> {
     if (journeyNumber > 7) {
         throw new Error("Congrats on completing the treasure hunt! Stay tuned for future adventures.");
     }
@@ -803,8 +803,10 @@ export async function sendProjectToReview(slackId: string, journeyNumber: number
                         status: "unreviewed",
                         "Screenshot": [{ url: screenshotUrl }],
                         "Description": description,
+                        aiUsage,
                         "GitHub Username": githubUsername,
                         "Code URL": codeUrl,
+                        "Readme URL": readmeUrl,
                         "Playable URL": playableUrl,
                     } as any
                 },
@@ -1153,7 +1155,7 @@ export async function submitProjectForReview(slackId: string, projectId: string)
                 reject(new Error("Project code URL must be a GitHub repository URL before submission."));
                 return;
             }
-            sendProjectToReview(slackId, project.journeyNumber, project.projectName, project.screenshot, project.description, githubUsername, project.codeUrl, project.demoUrl).then((submissionRecordId) => {
+            sendProjectToReview(slackId, project.journeyNumber, project.projectName, project.screenshot, project.description, project.aiUsage || "", githubUsername, project.codeUrl, project.readmeUrl, project.demoUrl).then((submissionRecordId) => {
                 base("Submissions").find(submissionRecordId, (subFetchErr, submissionRecord) => {
                     if (subFetchErr) {
                         console.error("Error fetching created submission record:", subFetchErr);
@@ -1269,8 +1271,10 @@ function submissionRecordToSubmission(record: AirtableRecord<AirtableFieldSet>):
         "Optional - Override Hours Spent Justification": record.get("Optional - Override Hours Spent Justification") as string | undefined,
         "Screenshot": record.get("Screenshot") as string[],
         "Description": record.get("Description") as string,
+                aiUsage: record.get("aiUsage") as string,
         "GitHub Username": record.get("GitHub Username") as string,
         "Code URL": record.get("Code URL") as string,
+        "Readme URL": record.get("Readme URL") as string,
         "Playable URL": record.get("Playable URL") as string,
         "User": getFirstOrDefault(record.get("User")),
         "Slack ID": getFirstOrDefault(record.get("Slack ID")),
@@ -1311,10 +1315,36 @@ export async function getAllApprovedProjects(): Promise<Project[]> {
                     readmeUrl: record.get("readmeUrl") as string,
                     demoUrl: record.get("demoUrl") as string,
                     screenshot: record.get("screenshot") as string,
+                    aiUsage: record.get("aiUsage") as string | null,
                     hackatimeProject: record.get("hackatimeProject") as string,
                     journeyNumber: record.get("journeyNumber") as number,
+                    status: record.get("status") as "unreviewed" | "rejected" | "approved" | null,
+                    submission: record.get("submission") as string | null,
+                    yswsEligible: Boolean(record.get("yswsEligible")),
                 }));
                 resolve(projects);
+            }
+        );
+    });
+}
+
+export async function getPendingSubmissions(): Promise<Submission[]> {
+    return new Promise<Submission[]>((resolve, reject) => {
+        const collected: AirtableRecord<AirtableFieldSet>[] = [];
+        base("Submissions").select({
+            filterByFormula: `{status} = 'unreviewed'`
+        }).eachPage(
+            (records: ReadonlyArray<AirtableRecord<AirtableFieldSet>>, fetchNextPage: () => void) => {
+                collected.push(...records);
+                fetchNextPage();
+            },
+            (err: any) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                const submissions = collected.map(submissionRecordToSubmission);
+                resolve(submissions);
             }
         );
     });

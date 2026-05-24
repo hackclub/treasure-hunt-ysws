@@ -7,8 +7,10 @@ export async function GET() {
         "hackatime project", // HackatimeProjectName
         "https://cdn.hackclub.com/019d8810-944d-7e3e-9650-9650b638ab40/61RahTQtAqL._AC_UF894,1000_QL80_.jpg", // screenshotUrl
         "a description", // description
+        "none", // aiUsage
         "pkd2210", // githubUsername
         "https://github.com", // codeUrl
+        "https://github.com/README.md", // readmeUrl
         "https://google.com" // playableUrl
     );
 

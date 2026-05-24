@@ -67,7 +67,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         }
     }
 
-    if (event.url.pathname.startsWith('/review')) {
+    if (event.url.pathname.startsWith('/review') || event.url.pathname.startsWith('/api/review')) {
         if (!slackId) {
             throw redirect(303, '/');
         }

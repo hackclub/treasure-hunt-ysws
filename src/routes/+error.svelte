@@ -44,7 +44,7 @@
     </text>
 
     <!-- 5. Return Button (Using the Dashboard Style) -->
-    <a href={lastPage} style="cursor: pointer; text-decoration: none;" data-sveltekit-preload-data="viewport" data-sveltekit-preload-code="viewport">
+    <a href={lastPage} style="cursor: pointer; text-decoration: none;" data-sveltekit-preload-data="hover" data-sveltekit-preload-code="hover">
       <g transform="translate(140, 330) scale(1)">
         <path d="M5,8 Q10,2 30,5 L220,2 Q235,5 232,20 L238,35 Q220,43 120,40 L20,43 Q5,40 8,25 Z" 
               fill="#FFB400" 

@@ -66,8 +66,10 @@ export type Submission = {
     "Optional - Override Hours Spent Justification"?: string;
     "Screenshot": string[];
     "Description": string;
+    aiUsage: string;
     "GitHub Username": string;
     "Code URL": string;
+    "Readme URL": string;
     "Playable URL": string;
     "User": string;
     "Slack ID": string;
