@@ -149,7 +149,7 @@
           stroke-linejoin="round" />
 
     <!-- Title -->
-    <text x="50%" y="80" text-anchor="middle" font-family="'Comic Sans MS', 'Chalkboard SE', sans-serif" font-weight="900" font-size="32" fill="#1B2D48">THE SEVEN JOURNEYS</text>
+    <text x="50%" y="80" text-anchor="middle" font-family="'Comic Sans MS', 'Chalkboard SE', sans-serif" font-weight="900" font-size="32" fill="#1B2D48">CURRENT JOURNEY</text>
 
     <!-- THE 7 TRAILS (Dashed Paths) -->
     <!-- Trail 1-2 (Completed) -->
