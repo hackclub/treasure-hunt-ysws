@@ -9,6 +9,7 @@
     let claimStates = $state({});
     let currentSlackId = $state("");
     let claimClock = $state(Date.now());
+    let claimStatesLoaded = $state(false);
 
     const formatRemainingTime = (remainingMs) => {
         const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
@@ -30,6 +31,7 @@
             }
         }));
         claimStates = Object.fromEntries(entries);
+        claimStatesLoaded = true;
     };
 
     const getClaimState = (projectId) => claimStates[projectId] ?? null;
@@ -114,6 +116,7 @@
             });
         projectsRequest.then(fetchedProjects => {
             projects = fetchedProjects;
+            claimStatesLoaded = false;
             void loadClaimStates(fetchedProjects);
         });
     });
@@ -165,6 +168,12 @@
 </a>
 </div>
 <div class="mt-4 flex flex-col gap-4">
+{#if !claimStatesLoaded}
+    <div class="p-4 rounded-md border border-border bg-secondary opacity-50">
+        <div class="font-bold text-primary-foreground">Loading review cards...</div>
+        <div class="text-sm text-foreground/80">Checking claim locks before showing cards.</div>
+    </div>
+{:else}
 {#if $activeType === "all"}
     {#each projects.filter(project => project.status === "pending") as project}
     {#if isClaimedBySomeoneElse(project)}
@@ -220,5 +229,6 @@
         </a>
     {/if}
     {/each}
+{/if}
 {/if}
 </div>
