@@ -16,6 +16,7 @@
     let { data } = $props();
     let journeysStatus = $derived(data.journeysStatus);
     let projects = $derived(data.projects);
+    let activeExpedition = $derived(data.activeExpedition);
 
     const getJourneyState = (journeyProjects) => {
       const project = journeyProjects[0];
@@ -96,8 +97,8 @@
 
       <!-- Title: "TIME IS RUNNING OUT" -->
       <text class="title" x="50%" y="45" text-anchor="middle" font-family="'Luckiest Guy', cursive" font-weight="900" font-size="22" fill="#1B2D48" style="text-transform: uppercase; letter-spacing: 2px;">
-        ⏳ MISSION DEADLINE
-      </text>
+          ⏳ MISSION DEADLINE
+        </text>
 
       <!-- Timer Container Boxes -->
       <g transform="translate(45, 65)">
@@ -149,7 +150,7 @@
           stroke-linejoin="round" />
 
     <!-- Title -->
-    <text x="50%" y="80" text-anchor="middle" font-family="'Comic Sans MS', 'Chalkboard SE', sans-serif" font-weight="900" font-size="32" fill="#1B2D48">CURRENT JOURNEY</text>
+    <text x="50%" y="80" text-anchor="middle" font-family="'Comic Sans MS', 'Chalkboard SE', sans-serif" font-weight="900" font-size="32" fill="#1B2D48">ACTIVE EXPEDITION: {String(activeExpedition || '').toUpperCase()}</text>
 
     <!-- THE 7 TRAILS (Dashed Paths) -->
     <!-- Trail 1-2 (Completed) -->

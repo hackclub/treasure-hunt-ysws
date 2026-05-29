@@ -19,8 +19,13 @@ export async function load({ fetch }) {
       return getJourneyState(journeyProjects);
     });
     
+    const responseExpedition = await fetch('/api/expedition/get');
+    const dataExpedition = await responseExpedition.json();
+    const activeExpedition = dataExpedition.activeExpedition;
+
     return {
       journeysStatus,
+      activeExpedition,
       projects
     };
   } catch (error) {

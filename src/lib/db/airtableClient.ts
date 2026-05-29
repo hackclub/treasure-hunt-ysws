@@ -1805,3 +1805,37 @@ export async function getProjectById(projectId: string): Promise<Project | null>
         });
     });
 }
+
+export async function getActiveExpedition(slackId: string): Promise<string | null> {
+    const userRecord = await userSlackIdToUserRecord(slackId);
+    if (!userRecord) {
+        return null;
+    }
+    return new Promise<string | null>((resolve, reject) => {
+        base("Users").find(userRecord.id, (error, record) => {
+            if (error || !record) {
+                reject(error ?? new Error("User not found"));
+                return;
+            }
+            const expedition = record.get("expedition") as string | null;
+            resolve(expedition ?? null);
+        });
+    });
+}
+
+export async function setActiveExpedition(slackId: string, expedition: string | null): Promise<void> {
+    const userRecord = await userSlackIdToUserRecord(slackId);
+    if (!userRecord) {
+        throw new Error("User not found");
+    }
+    return new Promise<void>((resolve, reject) => {
+        const updateData: Record<string, string | undefined> = { expedition: expedition ?? undefined };
+        base("Users").update(userRecord.id, updateData, (error) => {
+            if (error) {
+                reject(error);
+                return;
+            }
+            resolve();
+        });
+    });
+}

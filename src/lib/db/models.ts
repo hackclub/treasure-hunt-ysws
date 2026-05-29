@@ -27,6 +27,7 @@ export type User = {
     zip: string;
     birthday: string;
     yswsEligible: boolean;
+    expedition: string | null;
 };
 
 export type Order = {

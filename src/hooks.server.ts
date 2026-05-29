@@ -1,4 +1,4 @@
-import { getSlackId, isAdmin, isReviewer } from "$lib/db/airtableClient";
+import { getSlackId, isAdmin, isReviewer, getActiveExpedition } from "$lib/db/airtableClient";
 import { HCA_CLIENT_ID, HCA_CLIENT_SECRET } from "$env/static/private";
 import { redirect, type Handle } from '@sveltejs/kit';
 
@@ -64,6 +64,13 @@ export const handle: Handle = async ({ event, resolve }) => {
     if (event.url.pathname.startsWith('/dashboard')) {
         if (!slackId) {
             throw redirect(303, '/');
+        }
+        const activeExpedition = await getActiveExpedition(slackId);
+        if (activeExpedition === null && !event.url.pathname.startsWith('/dashboard/start')) {
+            throw redirect(303, '/dashboard/start');
+        }
+        if (activeExpedition !== null && event.url.pathname.startsWith('/dashboard/start')) {
+            throw redirect(303, '/dashboard/');
         }
     }
 
