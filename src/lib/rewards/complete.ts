@@ -1,4 +1,4 @@
-import { journeyIdToRecordId, getJourneyById, userSlackIdToUserRecord, addToCompleters, updateJourneyNumber } from "$lib/db/airtableClient";
+import { journeyIdToRecordId, getJourneyById, userSlackIdToUserRecord, addToCompleters, updateJourneyNumber, getActiveExpedition, createOrder, getSubmissionBySlackId, getGoldBars, updateGoldBars } from "$lib/db/airtableClient";
 
 export async function completeJourney(slackId: string, journeyNumber: number) {
     const journeyRecordId = journeyIdToRecordId(journeyNumber);
@@ -36,6 +36,109 @@ export async function completeJourney(slackId: string, journeyNumber: number) {
     //}
     // 2. send project into review.
     // 3. add them to the completers list of the journey
+
+    // fullfill
+    const activeExpedition = await getActiveExpedition(slackId);
+    // fullfill general
+    if (activeExpedition == 'general') {
+        let itemId;
+        switch(currentJourneyNumber) {
+            case 1: 
+                itemId = "1";
+                break;
+            case 2:
+                itemId = "2";
+                break;
+            case 3:
+                itemId = "3";
+                break;
+            case 4:
+                itemId = "4";
+                break;
+            case 5:
+                itemId = "5";
+                break;
+            case 6:
+                itemId = "6";
+                break;
+            case 7:
+                itemId = "7";
+                break;
+            default:
+                throw new Error(`No day prize item configured for journey ${currentJourneyNumber}`);
+        }
+        const order = {
+                    slackId: slackId,
+                    itemId: itemId,
+                    amount: 1,
+                    totalPrice: 0,
+                    address: `${userRecord.get("address1")}, ${userRecord.get("address2")}, ${userRecord.get("city")}, ${userRecord.get("state")}, ${userRecord.get("zip")}`,
+                    email: userRecord.get("email") as string,
+                    phone: userRecord.get("phone") as string,
+                    country: userRecord.get("country") as string,
+                    isDayPrize: true,
+                    status: "pending" as const
+                };
+        await createOrder(order);
+    }
+    // fullfill hardware
+    if (activeExpedition == 'hardware') {
+        let itemId;
+        switch(currentJourneyNumber) {
+            case 1: 
+                itemId = "12";
+                break;
+            case 2:
+                itemId = "13";
+                break;
+            case 3:
+                itemId = "14";
+                break;
+            case 4:
+                itemId = "15";
+                break;
+            case 5:
+                itemId = "16";
+                break;
+            case 6:
+                itemId = "17";
+                break;
+            case 7:
+                itemId = "18";
+                break;
+            default:
+                throw new Error(`No day prize item configured for journey ${currentJourneyNumber}`);
+        }
+        const order = {
+                    slackId: slackId,
+                    itemId: itemId,
+                    amount: 1,
+                    totalPrice: 0,
+                    address: `${userRecord.get("address1")}, ${userRecord.get("address2")}, ${userRecord.get("city")}, ${userRecord.get("state")}, ${userRecord.get("zip")}`,
+                    email: userRecord.get("email") as string,
+                    phone: userRecord.get("phone") as string,
+                    country: userRecord.get("country") as string,
+                    isDayPrize: true,
+                    status: "pending" as const
+                };
+        await createOrder(order);
+    }
+
+    // add gold bars for completing the journey, 10 goldbars per hour after the fourth hour
+    try {
+        const submission = await getSubmissionBySlackId(slackId);
+        const hoursSpent = submission?.["Optional - Override Hours Spent"] ?? 0;
+        const extraHours = Math.max(0, Math.floor(Number(hoursSpent)) - 4);
+        if (extraHours > 0) {
+            const rate = 10;
+            const goldToAdd = extraHours * rate;
+            const currentGold = await getGoldBars(undefined, slackId);
+            await updateGoldBars(slackId, (currentGold || 0) + goldToAdd);
+        }
+    } catch (err) {
+        console.error("Error awarding gold bars:", err);
+    }
+
     await addToCompleters(journeyNumber, userRecord.id);
     // 3.5. Bump journeyNumber only forward, never backwards when backfilling older journeys
     if (nextJourneyNumber > currentJourneyNumber) {
