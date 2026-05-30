@@ -85,10 +85,10 @@ const id = $page.params.id;
       }
     };
 
-    // get hours trhourgh https://hackatime.hackclub.com/api/v1/users/U091DE0M4NB/stats?features=projects&start_date=2026-03-04
+    // get hours through https://hackatime.hackclub.com/api/v1/users/U091DE0M4NB/stats?features=projects&start_date=2026-05-30&end_date=2026-07-31
     const fetchHours = async () => {
         try {
-            const response = await fetch(`https://hackatime.hackclub.com/api/v1/users/${slackId}/stats?features=projects&start_date=2026-05-24`);
+        const response = await fetch(`https://hackatime.hackclub.com/api/v1/users/${slackId}/stats?features=projects&start_date=2026-05-30&end_date=2026-07-31`);
             const data = await response.json();
         const stats = data.data ?? data;
           trustLevel = data.trust_factor?.trust_level || stats.trust_factor?.trust_level || "";

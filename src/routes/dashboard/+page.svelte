@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
 
-    const DeadlineDate = new Date("June 30, 2026 23:59:59").getTime();
+    const DeadlineDate = new Date("July 31, 2026 23:59:59").getTime();
 
     let timeRemaining = DeadlineDate - Date.now();
 

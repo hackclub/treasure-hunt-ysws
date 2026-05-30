@@ -200,7 +200,7 @@
       <!-- Hackatime Project -->
       <text x="0" y="680" font-family="'Luckiest Guy', cursive" font-weight="bold" font-size="16" fill="#1B2D48">HACKATIME PROJECT NAME</text>
       <foreignObject x="0" y="690" width="640" height="40">
-      <HackatimeProjects slackId={data.slackId} startingDate="2025-01-01" bind:value={hackatimeProjectValue} name="hackatimeProject" style="width: 100%; height: 100%; background: #E8D5A0; border: 2px solid #1B2D48; border-radius: 8px; padding: 0 10px; box-sizing: border-box;" />
+      <HackatimeProjects slackId={data.slackId} startingDate="2026-05-30" bind:value={hackatimeProjectValue} name="hackatimeProject" style="width: 100%; height: 100%; background: #E8D5A0; border: 2px solid #1B2D48; border-radius: 8px; padding: 0 10px; box-sizing: border-box;" />
       </foreignObject>
 
       <!-- Project Type (native select overlay inserted below SVG) -->
