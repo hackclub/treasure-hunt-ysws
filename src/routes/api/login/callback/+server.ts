@@ -56,6 +56,21 @@ export async function GET(request: Request) {
 
     const userData = await userResponse.json();
     const slackId = userData.slack_id || (userData.identity && userData.identity.slack_id);
+    const identity = userData.identity || {};
+    const primaryAddress = (identity.addresses || []).find((address: any) => address.primary) || identity.addresses?.[0] || {};
+    const birthday =
+        userData.birthdate ||
+        userData.birthday ||
+        identity.birthdate ||
+        identity.birthday ||
+        "";
+    const phone = userData.phone_number || identity.phone_number || primaryAddress.phone_number || "";
+    const address1 = primaryAddress.line_1 || "";
+    const address2 = primaryAddress.line_2 || "";
+    const city = primaryAddress.city || "";
+    const state = primaryAddress.state || "";
+    const zip = primaryAddress.postal_code || "";
+    const country = primaryAddress.country || "";
 
     if (!slackId) {
         console.error("No slack_id in user data:", userData);
@@ -67,21 +82,22 @@ export async function GET(request: Request) {
         await addUser({
             slackId,
             goldBars: 0,
-            firstName: userData.first_name || (userData.identity && userData.identity.first_name) || "",
-            lastName: userData.last_name || (userData.identity && userData.identity.last_name) || "",
-            address1: "",
-            address2: "",
-            city: "",
-            state: "",
-            zip: "",
-            email: userData.email || (userData.identity && userData.identity.primary_email) || "",
-            phone: "",
-            country: "",
+            firstName: userData.first_name || identity.first_name || "",
+            lastName: userData.last_name || identity.last_name || "",
+            address1,
+            address2,
+            city,
+            state,
+            zip,
+            email: userData.email || identity.primary_email || "",
+            phone,
+            country,
             admin: false,
             reviewer: false,
-            birthday: "",
+            birthday,
             journeyNumber: 1,
-            yswsEligible: userData.ysws_eligible,
+            expedition: null,
+            yswsEligible: userData.ysws_eligible ?? identity.ysws_eligible ?? false,
         });
     }
 

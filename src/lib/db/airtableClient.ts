@@ -365,31 +365,36 @@ export async function isReviewer(slackId?: string, request?: Request): Promise<b
 
 // User Management functions
 export function addUser(user: User): Promise<void> {
+    const fields: Record<string, unknown> = {
+        slackId: user.slackId,
+        goldBars: 0,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        address1: user.address1 || "",
+        address2: user.address2 || "",
+        city: user.city || "",
+        state: user.state || "",
+        zip: user.zip || "",
+        email: user.email || "",
+        phone: user.phone || "",
+        country: user.country || "",
+        admin: false,
+        reviewer: false,
+        journeyNumber: 1,
+    };
+
+    if (user.birthday && user.birthday.trim()) {
+        fields.birthday = user.birthday;
+    }
+
     return new Promise((resolve, reject) => {
         base("Users").create(
             [
                 {
-                    fields: {
-                        slackId: user.slackId,
-                        goldBars: 0,
-                        firstName: user.firstName,
-                        lastName: user.lastName,
-                        address1: user.address1 || "",
-                        address2: user.address2 || "",
-                        city: user.city || "",
-                        state: user.state || "",
-                        zip: user.zip || "",
-                        email: user.email || "",
-                        phone: user.phone || "",
-                        country: user.country || "",
-                        admin: false,
-                        reviewer: false,
-                        birthday: user.birthday || "",
-                        journeyNumber: 1,
-                    },
+                    fields: fields as AirtableFieldSet,
                 },
             ],
-            (error) => {
+            (error: any) => {
                 if (error) {
                     reject(error);
                 } else {
