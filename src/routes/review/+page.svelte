@@ -235,7 +235,6 @@
                 <div class="rounded-md border border-border bg-background/60 p-3 text-sm text-foreground/80">Approved: <span class="font-semibold text-primary-foreground">{reviewStats.publicInfo.approvedProjects}</span></div>
                 <div class="rounded-md border border-border bg-background/60 p-3 text-sm text-foreground/80">Rejected: <span class="font-semibold text-primary-foreground">{reviewStats.publicInfo.rejectedProjects}</span></div>
                 <div class="rounded-md border border-border bg-background/60 p-3 text-sm text-foreground/80">Total submissions: <span class="font-semibold text-primary-foreground">{reviewStats.publicInfo.totalSubmissions}</span></div>
-                <div class="rounded-md border border-border bg-background/60 p-3 text-sm text-foreground/80">Total reviewed for payout: <span class="font-semibold text-primary-foreground">{reviewStats.totals.paidFor}</span></div>
             </div>
             <hr class="my-4 border-border" />
             <div class="font-semibold text-primary-foreground">Reviewer breakdown</div>
@@ -248,7 +247,6 @@
                             <tr class="text-left text-foreground/60">
                                 <th class="border-b border-border px-2 py-2">Reviewer</th>
                                 <th class="border-b border-border px-2 py-2">Reviewed</th>
-                                <th class="border-b border-border px-2 py-2">Paid for</th>
                                 <th class="border-b border-border px-2 py-2">Approved</th>
                                 <th class="border-b border-border px-2 py-2">Rejected</th>
                                 <th class="border-b border-border px-2 py-2">Pending</th>
@@ -259,7 +257,6 @@
                                 <tr class="border-b border-border/60">
                                     <td class="px-2 py-2 font-medium text-primary-foreground">{reviewer.reviewer}</td>
                                     <td class="px-2 py-2">{reviewer.reviewed}</td>
-                                    <td class="px-2 py-2">{reviewer.paidFor}</td>
                                     <td class="px-2 py-2">{reviewer.approved}</td>
                                     <td class="px-2 py-2">{reviewer.rejected}</td>
                                     <td class="px-2 py-2">{reviewer.pending}</td>

@@ -92,7 +92,6 @@ export type Submission = {
 export type ReviewerStatistics = {
     reviewer: string;
     reviewed: number;
-    paidFor: number;
     approved: number;
     rejected: number;
     pending: number;
@@ -103,7 +102,6 @@ export type ReviewStatistics = {
         submissions: number;
         pending: number;
         reviewed: number;
-        paidFor: number;
         approved: number;
         rejected: number;
         projectsApproved: number;

@@ -1454,7 +1454,7 @@ function normalizeStatus(status: unknown): string {
 function getSubmissionReviewState(
     submission: AirtableRecord<AirtableFieldSet>,
     projectStatusBySubmissionId: Map<string, string>
-): { reviewed: boolean; paidFor: boolean; approved: boolean; rejected: boolean; pending: boolean } {
+): { reviewed: boolean; approved: boolean; rejected: boolean; pending: boolean } {
     const status = normalizeStatus(submission.get("status"));
     const claimedBy = String(submission.get("claimedBy") || "").trim();
     const projectStatus = normalizeStatus(projectStatusBySubmissionId.get(submission.id));
@@ -1462,9 +1462,7 @@ function getSubmissionReviewState(
     const rejected = status === "rejected" || projectStatus === "rejected";
     const reviewed = Boolean(claimedBy);
     const pending = reviewed && status === "unreviewed";
-    const paidFor = reviewed && (approved || rejected || status !== "unreviewed");
-
-    return { reviewed, paidFor, approved, rejected, pending };
+    return { reviewed, approved, rejected, pending };
 }
 
 export async function getReviewStatistics(): Promise<ReviewStatistics> {
@@ -1495,7 +1493,6 @@ export async function getReviewStatistics(): Promise<ReviewStatistics> {
     const reviewersBySlackId = new Map<string, ReviewerStatistics>();
     let pendingSubmissions = 0;
     let reviewedSubmissions = 0;
-    let paidForReviews = 0;
 
     for (const submission of submissionRecords) {
         const status = normalizeStatus(submission.get("status"));
@@ -1513,7 +1510,6 @@ export async function getReviewStatistics(): Promise<ReviewStatistics> {
         const current = reviewersBySlackId.get(claimedBy) ?? {
             reviewer: claimedBy,
             reviewed: 0,
-            paidFor: 0,
             approved: 0,
             rejected: 0,
             pending: 0,
@@ -1523,10 +1519,6 @@ export async function getReviewStatistics(): Promise<ReviewStatistics> {
         reviewedSubmissions += 1;
         if (reviewState.pending) {
             current.pending += 1;
-        }
-        if (reviewState.paidFor) {
-            current.paidFor += 1;
-            paidForReviews += 1;
         }
         if (reviewState.approved) {
             current.approved += 1;
@@ -1562,7 +1554,6 @@ export async function getReviewStatistics(): Promise<ReviewStatistics> {
             submissions: submissionRecords.length,
             pending: pendingSubmissions,
             reviewed: reviewedSubmissions,
-            paidFor: paidForReviews,
             approved: projectsApproved,
             rejected: projectsRejected,
             projectsApproved,
