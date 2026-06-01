@@ -1,7 +1,7 @@
 import AirtablePkg from "airtable";
 import type { AirtableFieldSet, AirtableRecord } from './airtable-types';
 const Airtable = AirtablePkg;
-import type { Item, Journey, Order, Reward, User, Submission, Project } from "./models";
+import type { Item, Journey, Order, Reward, User, Submission, Project, ReviewStatistics, ReviewerStatistics } from "./models";
 import { AIRTABLE_KEY, AIRTABLE_BASE_ID, FRAUD_API_KEY } from '$env/static/private';
 import { joinChannel, sendUpdateDM } from "$lib/server/slack/slackClient";
 import { completeJourney } from "$lib/rewards/complete";
@@ -1286,7 +1286,7 @@ function submissionRecordToSubmission(record: AirtableRecord<AirtableFieldSet>):
         id: record.get("id") as number,
         journeyNumber: record.get("journeyNumber") as number,
         "hackatime project": hackatimeProject,
-        status: record.get("status") as "unreviewed" | "rejected" | "approved",
+        status: record.get("status") as "unreviewed" | "rejected" | "approved" | "fraud-review",
         "Optional - Override Hours Spent": record.get("Optional - Override Hours Spent") as number | undefined,
         "Optional - Override Hours Spent Justification": record.get("Optional - Override Hours Spent Justification") as string | undefined,
         "Screenshot": record.get("Screenshot") as string[],
@@ -1407,6 +1407,177 @@ export async function getPendingSubmissions(): Promise<Submission[]> {
             }
         );
     });
+}
+
+async function getAllSubmissionRecords(): Promise<AirtableRecord<AirtableFieldSet>[]> {
+    return new Promise<AirtableRecord<AirtableFieldSet>[]>((resolve, reject) => {
+        const collected: AirtableRecord<AirtableFieldSet>[] = [];
+        base("Submissions").select().eachPage(
+            (records: ReadonlyArray<AirtableRecord<AirtableFieldSet>>, fetchNextPage: () => void) => {
+                collected.push(...records);
+                fetchNextPage();
+            },
+            (err: any) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                resolve(collected);
+            }
+        );
+    });
+}
+
+async function getAllProjectRecords(): Promise<AirtableRecord<AirtableFieldSet>[]> {
+    return new Promise<AirtableRecord<AirtableFieldSet>[]>((resolve, reject) => {
+        const collected: AirtableRecord<AirtableFieldSet>[] = [];
+        base("Projects").select().eachPage(
+            (records: ReadonlyArray<AirtableRecord<AirtableFieldSet>>, fetchNextPage: () => void) => {
+                collected.push(...records);
+                fetchNextPage();
+            },
+            (err: any) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                resolve(collected);
+            }
+        );
+    });
+}
+
+function normalizeStatus(status: unknown): string {
+    return String(status || "").trim().toLowerCase();
+}
+
+function getSubmissionReviewState(
+    submission: AirtableRecord<AirtableFieldSet>,
+    projectStatusBySubmissionId: Map<string, string>
+): { reviewed: boolean; paidFor: boolean; approved: boolean; rejected: boolean; pending: boolean } {
+    const status = normalizeStatus(submission.get("status"));
+    const claimedBy = String(submission.get("claimedBy") || "").trim();
+    const projectStatus = normalizeStatus(projectStatusBySubmissionId.get(submission.id));
+    const approved = status === "fraud-review" || status === "approved" || projectStatus === "approved";
+    const rejected = status === "rejected" || projectStatus === "rejected";
+    const reviewed = Boolean(claimedBy);
+    const pending = reviewed && status === "unreviewed";
+    const paidFor = reviewed && (approved || rejected || status !== "unreviewed");
+
+    return { reviewed, paidFor, approved, rejected, pending };
+}
+
+export async function getReviewStatistics(): Promise<ReviewStatistics> {
+    const [submissionRecords, projectRecords] = await Promise.all([
+        getAllSubmissionRecords(),
+        getAllProjectRecords(),
+    ]);
+
+    const projectStatusBySubmissionId = new Map<string, string>();
+    let projectsApproved = 0;
+    let projectsRejected = 0;
+
+    for (const projectRecord of projectRecords) {
+        const status = normalizeStatus(projectRecord.get("status"));
+        const submissionId = getFirstOrDefault(projectRecord.get("submission"));
+
+        if (status === "approved") {
+            projectsApproved += 1;
+        } else if (status === "rejected") {
+            projectsRejected += 1;
+        }
+
+        if (submissionId) {
+            projectStatusBySubmissionId.set(submissionId, status);
+        }
+    }
+
+    const reviewersBySlackId = new Map<string, ReviewerStatistics>();
+    let pendingSubmissions = 0;
+    let reviewedSubmissions = 0;
+    let paidForReviews = 0;
+
+    for (const submission of submissionRecords) {
+        const status = normalizeStatus(submission.get("status"));
+        const claimedBy = String(submission.get("claimedBy") || "").trim();
+
+        if (status === "unreviewed") {
+            pendingSubmissions += 1;
+        }
+
+        if (!claimedBy) {
+            continue;
+        }
+
+        const reviewState = getSubmissionReviewState(submission, projectStatusBySubmissionId);
+        const current = reviewersBySlackId.get(claimedBy) ?? {
+            reviewer: claimedBy,
+            reviewed: 0,
+            paidFor: 0,
+            approved: 0,
+            rejected: 0,
+            pending: 0,
+        };
+
+        current.reviewed += 1;
+        reviewedSubmissions += 1;
+        if (reviewState.pending) {
+            current.pending += 1;
+        }
+        if (reviewState.paidFor) {
+            current.paidFor += 1;
+            paidForReviews += 1;
+        }
+        if (reviewState.approved) {
+            current.approved += 1;
+        }
+        if (reviewState.rejected) {
+            current.rejected += 1;
+        }
+
+        reviewersBySlackId.set(claimedBy, current);
+    }
+
+    const reviewers = await Promise.all(Array.from(reviewersBySlackId.values()).map(async (reviewer) => {
+        const firstName = await getFirstName(undefined, reviewer.reviewer);
+        const lastName = await getLastName(undefined, reviewer.reviewer);
+        const displayName = [firstName, lastName].filter(Boolean).join(" ").trim() || reviewer.reviewer;
+
+        return {
+            ...reviewer,
+            reviewer: displayName,
+        };
+    }));
+
+    reviewers.sort((left, right) => {
+        if (right.reviewed !== left.reviewed) {
+            return right.reviewed - left.reviewed;
+        }
+
+        return left.reviewer.localeCompare(right.reviewer);
+    });
+
+    return {
+        totals: {
+            submissions: submissionRecords.length,
+            pending: pendingSubmissions,
+            reviewed: reviewedSubmissions,
+            paidFor: paidForReviews,
+            approved: projectsApproved,
+            rejected: projectsRejected,
+            projectsApproved,
+            projectsRejected,
+        },
+        publicInfo: {
+            totalProjects: projectRecords.length,
+            totalSubmissions: submissionRecords.length,
+            pendingSubmissions,
+            reviewedSubmissions,
+            approvedProjects: projectsApproved,
+            rejectedProjects: projectsRejected,
+        },
+        reviewers,
+    };
 }
 
 function findSubmissionRecord(submissionId: string): Promise<AirtableRecord<AirtableFieldSet> | null> {

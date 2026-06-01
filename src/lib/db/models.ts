@@ -63,7 +63,7 @@ export type Submission = {
     id: number;
     journeyNumber: number;
     "hackatime project": string;
-    status: "unreviewed" | "rejected" | "approved";
+    status: "unreviewed" | "rejected" | "approved" | "fraud-review";
     "Optional - Override Hours Spent"?: number;
     "Optional - Override Hours Spent Justification"?: string;
     "Screenshot": string[];
@@ -88,6 +88,37 @@ export type Submission = {
     "claimedAt": string;
     "projectType": string;
 }
+
+export type ReviewerStatistics = {
+    reviewer: string;
+    reviewed: number;
+    paidFor: number;
+    approved: number;
+    rejected: number;
+    pending: number;
+};
+
+export type ReviewStatistics = {
+    totals: {
+        submissions: number;
+        pending: number;
+        reviewed: number;
+        paidFor: number;
+        approved: number;
+        rejected: number;
+        projectsApproved: number;
+        projectsRejected: number;
+    };
+    publicInfo: {
+        totalProjects: number;
+        totalSubmissions: number;
+        pendingSubmissions: number;
+        reviewedSubmissions: number;
+        approvedProjects: number;
+        rejectedProjects: number;
+    };
+    reviewers: ReviewerStatistics[];
+};
 
 export type Project = {
     id: string;

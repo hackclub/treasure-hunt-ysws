@@ -10,6 +10,8 @@
     let currentSlackId = $state("");
     let claimClock = $state(Date.now());
     let claimStatesLoaded = $state(false);
+    let reviewStats = $state(null);
+    let reviewStatsLoaded = $state(false);
 
     const formatRemainingTime = (remainingMs) => {
         const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
@@ -70,6 +72,19 @@
                 currentSlackId = "";
             });
         return () => clearInterval(claimClockInterval);
+    });
+
+    onMount(() => {
+        fetch('/api/review/stats')
+            .then(response => response.ok ? response.json() : null)
+            .then(data => {
+                reviewStats = data;
+                reviewStatsLoaded = true;
+            })
+            .catch(() => {
+                reviewStats = null;
+                reviewStatsLoaded = true;
+            });
     });
 //    const projects = [
 //        {
@@ -199,13 +214,71 @@
 {:else if $activeType === "stats"}
     <div class="p-4 rounded-md border border-border bg-secondary">
         <div class="font-bold text-primary-foreground">Statistics</div>
-        <div class="text-sm text-foreground/80">Total pending projects: {pendingAmount()}</div>
-        <div class="text-sm text-foreground/80">Total projects: {projects.length}</div>
-        <hr class="my-2 border-border" />
-        pending projects per type:
-        {#each getProjectTypeList(projects) as type}
-            <div class="text-sm text-foreground/80">{type}: {typeToAmount(type)}</div>
-        {/each}
+        {#if !reviewStatsLoaded}
+            <div class="text-sm text-foreground/80">Loading public review statistics...</div>
+        {:else if reviewStats}
+            <div class="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                <div class="rounded-md border border-border bg-background/60 p-3">
+                    <div class="text-xs uppercase tracking-wide text-foreground/60">Pending</div>
+                    <div class="text-2xl font-bold text-primary-foreground">{reviewStats.publicInfo.pendingSubmissions}</div>
+                </div>
+                <div class="rounded-md border border-border bg-background/60 p-3">
+                    <div class="text-xs uppercase tracking-wide text-foreground/60">Reviewed</div>
+                    <div class="text-2xl font-bold text-primary-foreground">{reviewStats.publicInfo.reviewedSubmissions}</div>
+                </div>
+                <div class="rounded-md border border-border bg-background/60 p-3">
+                    <div class="text-xs uppercase tracking-wide text-foreground/60">Projects</div>
+                    <div class="text-2xl font-bold text-primary-foreground">{reviewStats.publicInfo.totalProjects}</div>
+                </div>
+            </div>
+            <div class="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                <div class="rounded-md border border-border bg-background/60 p-3 text-sm text-foreground/80">Approved: <span class="font-semibold text-primary-foreground">{reviewStats.publicInfo.approvedProjects}</span></div>
+                <div class="rounded-md border border-border bg-background/60 p-3 text-sm text-foreground/80">Rejected: <span class="font-semibold text-primary-foreground">{reviewStats.publicInfo.rejectedProjects}</span></div>
+                <div class="rounded-md border border-border bg-background/60 p-3 text-sm text-foreground/80">Total submissions: <span class="font-semibold text-primary-foreground">{reviewStats.publicInfo.totalSubmissions}</span></div>
+                <div class="rounded-md border border-border bg-background/60 p-3 text-sm text-foreground/80">Total reviewed for payout: <span class="font-semibold text-primary-foreground">{reviewStats.totals.paidFor}</span></div>
+            </div>
+            <hr class="my-4 border-border" />
+            <div class="font-semibold text-primary-foreground">Reviewer breakdown</div>
+            {#if reviewStats.reviewers.length === 0}
+                <div class="text-sm text-foreground/80">No reviewer activity yet.</div>
+            {:else}
+                <div class="mt-3 overflow-x-auto">
+                    <table class="min-w-full border-collapse text-sm">
+                        <thead>
+                            <tr class="text-left text-foreground/60">
+                                <th class="border-b border-border px-2 py-2">Reviewer</th>
+                                <th class="border-b border-border px-2 py-2">Reviewed</th>
+                                <th class="border-b border-border px-2 py-2">Paid for</th>
+                                <th class="border-b border-border px-2 py-2">Approved</th>
+                                <th class="border-b border-border px-2 py-2">Rejected</th>
+                                <th class="border-b border-border px-2 py-2">Pending</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {#each reviewStats.reviewers as reviewer}
+                                <tr class="border-b border-border/60">
+                                    <td class="px-2 py-2 font-medium text-primary-foreground">{reviewer.reviewer}</td>
+                                    <td class="px-2 py-2">{reviewer.reviewed}</td>
+                                    <td class="px-2 py-2">{reviewer.paidFor}</td>
+                                    <td class="px-2 py-2">{reviewer.approved}</td>
+                                    <td class="px-2 py-2">{reviewer.rejected}</td>
+                                    <td class="px-2 py-2">{reviewer.pending}</td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                </div>
+            {/if}
+            <hr class="my-4 border-border" />
+            <div class="text-sm text-foreground/80">Public summary: {reviewStats.totals.submissions} submissions, {reviewStats.totals.reviewed} reviewed, {reviewStats.totals.approved} approved, {reviewStats.totals.rejected} rejected.</div>
+            <hr class="my-4 border-border" />
+            <div class="font-semibold text-primary-foreground">Pending projects by type</div>
+            {#each getProjectTypeList(projects) as type}
+                <div class="text-sm text-foreground/80">{type}: {typeToAmount(type)}</div>
+            {/each}
+        {:else}
+            <div class="text-sm text-foreground/80">Unable to load review statistics.</div>
+        {/if}
     </div>
 {:else}
     {#each getProjectsPerType($activeType) as project}
