@@ -132,11 +132,12 @@ const id = $page.params.id;
           return () => clearInterval(claimClockInterval);
     });
         let justification = $state("");
-    let checklist = {
-        originality: true,
-        hackatime: false,
-        aiProportion: false
-    };
+        let checklist = {
+          functionalComplete: false,
+          effortOriginality: false,
+          readmeAndRepo: false,
+          historyAndNotes: false
+        };
 
     let submittingDecision = $state(false);
 
@@ -249,20 +250,24 @@ const id = $page.params.id;
         <div style="font-family: sans-serif; color: #1B2D48; display: flex; gap: 40px;">
           <div style="flex: 1;">
             <h3 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 900; color: #EC3750;">VERIFICATION CHECKLIST</h3>
-            <label style="display: block; margin-bottom: 6px; cursor: pointer;"><input type="checkbox" bind:checked={checklist.originality}> peleg remember to add stuff here</label>
-            <label style="display: block; margin-bottom: 6px; cursor: pointer;"><input type="checkbox" bind:checked={checklist.hackatime}> blablabla</label>
+            <label style="display: block; margin-bottom: 6px; cursor: pointer;"><input type="checkbox" bind:checked={checklist.functionalComplete}> Project is functional and complete</label>
+            <label style="display: block; margin-bottom: 6px; cursor: pointer;"><input type="checkbox" bind:checked={checklist.effortOriginality}> Shows meaningful effort, originality, and no plagiarism</label>
+            <label style="display: block; margin-bottom: 6px; cursor: pointer;"><input type="checkbox" bind:checked={checklist.readmeAndRepo}> README clear with screenshots/demo; contains executables</label>
+            <label style="display: block; margin-bottom: 6px; cursor: pointer;"><input type="checkbox" bind:checked={checklist.historyAndNotes}> Commit/progress history legitimate; follows rules; reviewer notes left</label>
           </div>
-          <div style="width: 300px;">
-             <h3 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 900; color: #EC3750;">EXTERNAL ROUTES</h3>
-             <div style="display: flex; flex-direction: column; gap: 5px;">
-                <button type="button" onclick={() => window.open(project.codeUrl, "_blank", "noopener,noreferrer")} style="background: #FFB400; border: 2px solid #1B2D48; font-weight: 900; font-size: 15px; padding: 4px; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;" onmouseenter={(event) => { event.currentTarget.style.transform = "translateY(-2px)"; event.currentTarget.style.boxShadow = "0 6px 0 #1B2D48"; event.currentTarget.style.filter = "brightness(1.05)"; }} onmouseleave={(event) => { event.currentTarget.style.transform = "translateY(0)"; event.currentTarget.style.boxShadow = "none"; event.currentTarget.style.filter = "none"; }}>GITHUB</button>
-                <button type="button" onclick={() => window.open(project.demoUrl, "_blank", "noopener,noreferrer")} style="background: #FFB400; border: 2px solid #1B2D48; font-weight: 900; font-size: 15px; padding: 4px; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;" onmouseenter={(event) => { event.currentTarget.style.transform = "translateY(-2px)"; event.currentTarget.style.boxShadow = "0 6px 0 #1B2D48"; event.currentTarget.style.filter = "brightness(1.05)"; }} onmouseleave={(event) => { event.currentTarget.style.transform = "translateY(0)"; event.currentTarget.style.boxShadow = "none"; event.currentTarget.style.filter = "none"; }}>DEMO</button>
-                <button type="button" onclick={() => project.readmeUrl && window.open(project.readmeUrl, "_blank", "noopener,noreferrer")} style="background: #FFB400; border: 2px solid #1B2D48; font-weight: 900; font-size: 15px; padding: 4px; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;" onmouseenter={(event) => { event.currentTarget.style.transform = "translateY(-2px)"; event.currentTarget.style.boxShadow = "0 6px 0 #1B2D48"; event.currentTarget.style.filter = "brightness(1.05)"; }} onmouseleave={(event) => { event.currentTarget.style.transform = "translateY(0)"; event.currentTarget.style.boxShadow = "none"; event.currentTarget.style.filter = "none"; }}>README</button>
-             </div>
-          </div>
+           <div style="width: 240px; box-sizing: border-box;">
+            
         </div>
       </foreignObject>
     </g>
+
+    <foreignObject x="640" y="780" width="300" height="160">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex; flex-direction:column; gap:6px;">
+        <h3 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 900; color: #EC3750;">EXTERNAL ROUTES</h3>
+        <button type="button" onclick={() => window.open(project.codeUrl, "_blank", "noopener,noreferrer")} style="display:block; width:100%; box-sizing:border-box; background: #FFB400; border: 2px solid #1B2D48; font-weight: 900; font-size: 13px; padding: 6px 8px; cursor: pointer;">GITHUB</button>
+        <button type="button" onclick={() => window.open(project.demoUrl, "_blank", "noopener,noreferrer")} style="display:block; width:100%; box-sizing:border-box; background: #FFB400; border: 2px solid #1B2D48; font-weight: 900; font-size: 13px; padding: 6px 8px; cursor: pointer;">DEMO</button>
+        <button type="button" onclick={() => project.readmeUrl && window.open(project.readmeUrl, "_blank", "noopener,noreferrer")} style="display:block; width:100%; box-sizing:border-box; background: #FFB400; border: 2px solid #1B2D48; font-weight: 900; font-size: 13px; padding: 6px 8px; cursor: pointer;">README</button>      </div>
+    </foreignObject>
 
     <g transform="translate(70, 1000)">
       <text x="0" y="0" font-family="sans-serif" font-weight="900" font-size="14" fill="#EC3750">FINAL JUSTIFICATION (REQUIRED)</text>
@@ -286,6 +291,11 @@ const id = $page.params.id;
       </div>
     </foreignObject>
 
+    <foreignObject x="340" y="1065" width="60%" height="250">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex; align-items:center; justify-content:center; height:100%;">
+        <button type="button" onclick={() => window.open('https://hackclub.gitbook.io/ysws-project-submission-guidelines/BLBRN8LIfoCZhFV6oMNR', "_blank", "noopener,noreferrer")} style="display:inline-block; background: #1E90FF; border: 2px solid #0B2540; color: #FFFFFF; font-weight: 900; font-size: 13px; padding: 8px 12px; cursor: pointer; border-radius: 6px; width:100%;">DOCS</button>
+      </div>
+    </foreignObject>
   </svg>
   </div>
 </form>
