@@ -184,6 +184,7 @@ export function getItems(): Promise<Item[]> {
                         name: record.get("name") as string,
                         description: record.get("description") as string,
                         price: record.get("price") as number,
+                        indiaPrice: record.get("indiaPrice") as number | undefined,
                         imageUrl: record.get("imageUrl") as string,
                         reward: record.get("reward") as boolean,
                     });
@@ -570,6 +571,7 @@ export async function getItem(itemId?: string, itemName?: string): Promise<Item 
                 name: record.get("name") as string,
                 description: record.get("description") as string,
                 price: record.get("price") as number,
+                indiaPrice: record.get("indiaPrice") as number | undefined,
                 imageUrl: record.get("imageUrl") as string,
                 reward: record.get("reward") as boolean,
             };

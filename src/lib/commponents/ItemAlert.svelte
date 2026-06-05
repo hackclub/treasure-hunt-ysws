@@ -9,10 +9,13 @@
     id: "",
     recId: "",
     imageUrl: "https://via.placeholder.com/100"
-  } } = $props();
+  }, selectedCountry = "global" } = $props();
 
+  const effectivePrice = $derived(
+    selectedCountry === "india" && item.indiaPrice != null ? item.indiaPrice : item.price
+  );
   let amount = $state(1);
-  let totalPrice = $derived(amount * item.price);
+  let totalPrice = $derived(amount * effectivePrice);
   let isSubmitting = $state(false);
   let errorMessage = $state('');
 
@@ -38,7 +41,8 @@
     try {
       const params = new URLSearchParams({
         itemId,
-        amount: String(amount)
+        amount: String(amount),
+        country: selectedCountry,
       });
       const response = await fetch(`/api/shop/buy?${params.toString()}`);
 
@@ -80,7 +84,7 @@
         <div class="flex-1">
           <h2 class="text-2xl font-black uppercase tracking-tight leading-none mb-1">{item.name}</h2>
           <p class="text-xs font-bold opacity-70 italic leading-tight">{item.description}</p>
-          <p class="mt-2 font-black text-lg text-[#EC3750] flex items-center gap-0">{item.price} <img src="/assets/Gold%20Bar.webp" alt="Gold" class="h-5 w-auto object-contain" draggable="false" /> / item</p>
+          <p class="mt-2 font-black text-lg text-[#EC3750] flex items-center gap-0">{effectivePrice} <img src="/assets/Gold%20Bar.webp" alt="Gold" class="h-5 w-auto object-contain" draggable="false" /> / item</p>
         </div>
       </div>
 

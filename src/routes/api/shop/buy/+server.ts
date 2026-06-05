@@ -4,6 +4,7 @@ export async function GET({ request }: { request: Request }) {
     const url = new URL(request.url);
     const itemId = url.searchParams.get("itemId");
     const amount = url.searchParams.get("amount");
+    const country = url.searchParams.get("country") || "global";
 
     if (!itemId || !amount) {
         return new Response("Missing itemId or amount", { status: 400 });
@@ -22,7 +23,7 @@ export async function GET({ request }: { request: Request }) {
     if (item.reward === true) {
         return new Response("Cannot purchase reward items", { status: 400 });
     }
-    const price = item.price;
+    const price = (country === "india" && item.indiaPrice != null) ? item.indiaPrice : item.price;
     const totalPrice = price * quantity;
 
     const slackId = await getSlackId(request);
