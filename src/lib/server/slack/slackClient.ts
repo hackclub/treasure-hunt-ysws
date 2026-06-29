@@ -1,14 +1,14 @@
 import { App } from "@slack/bolt";
-import { SLACK_APP_TOKEN, SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 let slackClient: App | null = null;
 
 function getSlackClient(): App {
     if (!slackClient) {
         slackClient = new App({
-            token: SLACK_BOT_TOKEN,
-            signingSecret: SLACK_SIGNING_SECRET,
-            appToken: SLACK_APP_TOKEN,
+            token: env.SLACK_BOT_TOKEN,
+            signingSecret: env.SLACK_SIGNING_SECRET,
+            appToken: env.SLACK_APP_TOKEN,
             socketMode: false,
         });
     }

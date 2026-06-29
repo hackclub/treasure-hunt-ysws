@@ -2,13 +2,13 @@ import AirtablePkg from "airtable";
 import type { AirtableFieldSet, AirtableRecord } from './airtable-types';
 const Airtable = AirtablePkg;
 import type { Item, Journey, Order, Reward, User, Submission, Project, ReviewStatistics, ReviewerStatistics } from "./models";
-import { AIRTABLE_KEY, AIRTABLE_BASE_ID, FRAUD_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { joinChannel, sendUpdateDM } from "$lib/server/slack/slackClient";
 import { completeJourney } from "$lib/rewards/complete";
 import { clearCache } from "$lib/server/projectsCache";
 import { get } from "node:http";
 import { send } from "node:process";
-const base = new Airtable({ apiKey: AIRTABLE_KEY }).base(AIRTABLE_BASE_ID);
+const base = new Airtable({ apiKey: env.AIRTABLE_KEY }).base(env.AIRTABLE_BASE_ID);
 const CLAIM_DURATION_MS = 30 * 60 * 1000;
 const FRAUD_EVENT_ID = process.env.FRAUD_EVENT_ID || "treasure-hunt";
 
@@ -17,7 +17,7 @@ function getFraudProjectUrl(): string {
 }
 
 function getFraudApiKey(): string {
-    return FRAUD_API_KEY;
+    return env.FRAUD_API_KEY;
 }
 
 function isFraudAuthFailure(status: number): boolean {

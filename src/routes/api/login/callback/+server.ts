@@ -1,5 +1,5 @@
 
-import { HCA_CLIENT_ID, HCA_CLIENT_SECRET } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { isUser, addUser } from "$lib/db/airtableClient";
 
 export async function GET(request: Request) {
@@ -15,8 +15,8 @@ export async function GET(request: Request) {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                client_id: HCA_CLIENT_ID,
-                client_secret: HCA_CLIENT_SECRET,
+                client_id: env.HCA_CLIENT_ID,
+                client_secret: env.HCA_CLIENT_SECRET,
                 code: authCode,
                 redirect_uri: url.origin + url.pathname,
                 grant_type: "authorization_code"

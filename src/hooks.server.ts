@@ -1,5 +1,5 @@
 import { getSlackId, isAdmin, isReviewer, getActiveExpedition } from "$lib/db/airtableClient";
-import { HCA_CLIENT_ID, HCA_CLIENT_SECRET } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { redirect, type Handle } from '@sveltejs/kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -19,8 +19,8 @@ export const handle: Handle = async ({ event, resolve }) => {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        "client_id": HCA_CLIENT_ID,
-                        "client_secret": HCA_CLIENT_SECRET,
+                        "client_id": env.HCA_CLIENT_ID,
+                        "client_secret": env.HCA_CLIENT_SECRET,
                         refresh_token: refreshToken,
                         grant_type: "refresh_token",
                     })

@@ -3,10 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        HCA_CLIENT_ID: ${HCA_CLIENT_ID}
-        HCA_CLIENT_SECRET: ${HCA_CLIENT_SECRET}
-        HCA_REDIRECT_ADDRESS: ${HCA_REDIRECT_ADDRESS}
     env_file:
       - .env
     environment:
