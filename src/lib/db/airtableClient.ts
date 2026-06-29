@@ -8,9 +8,18 @@ import { completeJourney } from "$lib/rewards/complete";
 import { clearCache } from "$lib/server/projectsCache";
 import { get } from "node:http";
 import { send } from "node:process";
-const base = new Airtable({ apiKey: env.AIRTABLE_KEY }).base(env.AIRTABLE_BASE_ID);
 const CLAIM_DURATION_MS = 30 * 60 * 1000;
 const FRAUD_EVENT_ID = process.env.FRAUD_EVENT_ID || "treasure-hunt";
+
+function getBase() {
+    if (!env.AIRTABLE_KEY || !env.AIRTABLE_BASE_ID) {
+        throw new Error("Airtable env vars are required at runtime");
+    }
+
+    return new Airtable({ apiKey: env.AIRTABLE_KEY }).base(env.AIRTABLE_BASE_ID);
+}
+
+const base: any = (...args: any[]) => (getBase() as any)(...args);
 
 function getFraudProjectUrl(): string {
     return `https://joe.fraud.hackclub.com/api/v1/ysws/events/${FRAUD_EVENT_ID}/projects`;
@@ -35,7 +44,7 @@ async function getUserRecords(slackId?: string, request?: Request): Promise<Airt
     }
     
     return new Promise((resolve, reject) => {
-        base("Users")
+        getBase()("Users")
             .select({ filterByFormula: `{slackId} = '${id}'` })
             .firstPage((error: any, records: ReadonlyArray<AirtableRecord<AirtableFieldSet>> = []) => {
                 if (error) {
@@ -175,7 +184,7 @@ export async function getJourneyNumber(request?: Request, slackId?: string): Pro
 export function getItems(): Promise<Item[]> {
     return new Promise((resolve, reject) => {
         const results: Item[] = [];
-        base("Items").select().eachPage(
+        getBase()("Items").select().eachPage(
             function page(records: ReadonlyArray<AirtableRecord<AirtableFieldSet>>, fetchNextPage: () => void) {
                 for (const record of records) {
                     results.push({
