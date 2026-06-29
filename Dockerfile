@@ -8,6 +8,12 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM base AS build
+ARG HCA_CLIENT_ID
+ARG HCA_CLIENT_SECRET
+ARG HCA_REDIRECT_ADDRESS
+ENV HCA_CLIENT_ID=${HCA_CLIENT_ID}
+ENV HCA_CLIENT_SECRET=${HCA_CLIENT_SECRET}
+ENV HCA_REDIRECT_ADDRESS=${HCA_REDIRECT_ADDRESS}
 RUN corepack enable
 RUN corepack prepare pnpm@10.33.2 --activate
 COPY --from=deps /app/node_modules ./node_modules
