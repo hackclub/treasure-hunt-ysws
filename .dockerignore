@@ -4,4 +4,3 @@ build
 .git
 .DS_Store
 pnpm-debug.log
-.env
