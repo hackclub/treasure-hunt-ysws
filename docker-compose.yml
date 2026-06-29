@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ghcr.io/hackclub/treasure-hunt-ysws-orchard:latest
     env_file:
       - .env
     environment:
