@@ -918,9 +918,11 @@ export async function updateProject(slackId: string, journeyNumber: number, upda
             if (!records || records.length === 0) { reject(new Error(`No project found for journey ${journeyNumber}`)); return; }
             
             // Verify this project belongs to the user
-            const project = records[0];
-            const users = project.get("user") as string[];
-            if (!users || !Array.isArray(users) || !users.includes(userRecord.id)) {
+            const project = records.find((record) => {
+                const users = record.get("user") as unknown;
+                return Array.isArray(users) && users.includes(userRecord.id);
+            });
+            if (!project) {
                 reject(new Error("You do not have permission to update this project"));
                 return;
             }
@@ -988,7 +990,7 @@ export async function getProjects(request?: Request, slackId?: string): Promise<
                     aiUsage: record.get("aiUsage") as string,
                     hackatimeProject: record.get("hackatimeProject") as string,
                     journeyNumber: record.get("journeyNumber") as number,
-                    submission: record.get("submission") as string | null,
+                    submission: getFirstOrDefault(record.get("submission")) || null,
                     projectType: record.get("projectType") as string,
                     rejectionReason: record.get("rejectionReason") as string | null,
                     yswsEligible: false,
@@ -1101,7 +1103,7 @@ export async function submitProjectForReview(slackId: string, projectId: string)
                 aiUsage: record.get("aiUsage") as string,
                 hackatimeProject: record.get("hackatimeProject") as string,
                 journeyNumber: record.get("journeyNumber") as number,
-                submission: record.get("submission") as string | null,
+                submission: getFirstOrDefault(record.get("submission")) || null,
                 projectType: record.get("projectType") as string,
                 yswsEligible: false,
             };
@@ -1387,7 +1389,7 @@ export async function getAllApprovedProjects(): Promise<Project[]> {
                     hackatimeProject: record.get("hackatimeProject") as string,
                     journeyNumber: record.get("journeyNumber") as number,
                     status: record.get("status") as "unreviewed" | "rejected" | "approved" | null,
-                    submission: record.get("submission") as string | null,
+                    submission: getFirstOrDefault(record.get("submission")) || null,
                     projectType: record.get("projectType") as string,
                     rejectionReason: record.get("rejectionReason") as string | null,
                     yswsEligible: Boolean(record.get("yswsEligible")),
@@ -1965,7 +1967,7 @@ export async function getProjectById(projectId: string): Promise<Project | null>
                 hackatimeProject: record.get("hackatimeProject") as string,
                 journeyNumber: record.get("journeyNumber") as number,
                 status: record.get("status") as "unreviewed" | "rejected" | "approved" | null,
-                submission: record.get("submission") as string | null,
+                submission: getFirstOrDefault(record.get("submission")) || null,
                 projectType: record.get("projectType") as string,
                 rejectionReason: record.get("rejectionReason") as string | null,
                 yswsEligible: Boolean(record.get("yswsEligible")),

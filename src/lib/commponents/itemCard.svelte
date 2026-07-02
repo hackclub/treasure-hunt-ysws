@@ -8,6 +8,7 @@
   const effectivePrice = $derived(
     selectedCountry === "india" && itemData.indiaPrice != null ? itemData.indiaPrice : itemData.price
   );
+  const estimatedHours = $derived(Number(effectivePrice ?? 0) / 10);
 
   const nameLines = $derived(getNameLines(itemData.name));
   const descriptionLines = $derived(getDescriptionLines(itemData.description));
@@ -127,8 +128,12 @@
       {/each}
     </text>
 
+    <text x="40" y="343" font-size="12" font-weight="bold" fill="#1B2D48" opacity="0.9">
+      ~{estimatedHours} Hours
+    </text>
+
     <!-- Price Tag: Gold Bar Yellow -->
-    <g transform="translate(190, 335)">
+    <g transform="translate(190, 350)">
       <path d="M0,0 L80,0 L90,15 L80,30 L0,30 Z" fill="#FFB400" stroke="#1B2D48" stroke-width="2" />
       <text x="34" y="20" text-anchor="middle" font-size="16" font-weight="bold" fill="#1B2D48">{effectivePrice}</text>
       <image href="/assets/Gold%20Bar.webp" x="30" y="-18" width="64" height="64" preserveAspectRatio="xMidYMid meet" />
