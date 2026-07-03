@@ -10,6 +10,20 @@ import { get } from "node:http";
 import { send } from "node:process";
 const CLAIM_DURATION_MS = 30 * 60 * 1000;
 const FRAUD_EVENT_ID = process.env.FRAUD_EVENT_ID || "treasure-hunt";
+function isAirtableAuthError(error: unknown): boolean {
+    if (!error || typeof error !== "object") return false;
+    const statusCode = (error as { statusCode?: unknown }).statusCode;
+    return statusCode === 401 || statusCode === 403;
+}
+
+function formatAirtableAuthError(operation: string): Error {
+    const baseId = env.AIRTABLE_BASE_ID || "<missing base id>";
+    return new Error(
+        `${operation} failed because Airtable rejected the request. ` +
+        `Check that the PAT is shared with base ${baseId} and has write access to the relevant table. ` +
+        `Scopes alone are not enough for Airtable PATs.`
+    );
+}
 
 function getBase() {
     if (!env.AIRTABLE_KEY || !env.AIRTABLE_BASE_ID) {
@@ -796,7 +810,7 @@ export async function sendProjectToReview(slackId: string, journeyNumber: number
             },
             function done(error: any) {
                 if (error) {
-                    reject(error);
+                    reject(isAirtableAuthError(error) ? formatAirtableAuthError("Checking submission history") : error);
                     return;
                 }
                 resolve();
@@ -835,7 +849,7 @@ export async function sendProjectToReview(slackId: string, journeyNumber: number
             ],
             (error: unknown, records?: readonly AirtableRecord<AirtableFieldSet>[]) => {
                 if (error) {
-                    reject(error);
+                    reject(isAirtableAuthError(error) ? formatAirtableAuthError("Submitting a project for review") : error);
                     return;
                 }
                 if (!records || records.length === 0) {
@@ -868,7 +882,10 @@ export async function createProject(slackId: string, project: Project): Promise<
         base("Projects").select({
             filterByFormula: `AND({user} = '${userRecord.id}', {journeyNumber} = ${project.journeyNumber})`
         }).firstPage((checkErr, existing) => {
-            if (checkErr) { reject(checkErr); return; }
+            if (checkErr) {
+                reject(isAirtableAuthError(checkErr) ? formatAirtableAuthError("Creating a project") : checkErr);
+                return;
+            }
             if (existing?.length) { reject(new Error(`Already have a project for journey ${project.journeyNumber}`)); return; }
             base("Projects").create(
             [
@@ -891,7 +908,7 @@ export async function createProject(slackId: string, project: Project): Promise<
             ],
                     (error: unknown, records?: readonly AirtableRecord<AirtableFieldSet>[]) => {
                 if (error) {
-                    reject(error);
+                    reject(isAirtableAuthError(error) ? formatAirtableAuthError("Creating a project") : error);
                     return;
                 }
                 if (!records || records.length === 0) {
