@@ -97,7 +97,7 @@ export async function sendReviewerChannelAlert(channelId: string, opts: {
 }) {
     try {
         const client = getSlackClient();
-        const reviewUrl = `https://treasure.peleg2210.tech/review/${opts.submissionId}`;
+        const reviewUrl = `https://treasure.hackclub.com/review/${opts.submissionId}`;
         await client.client.chat.postMessage({
             channel: channelId,
             text: `New submission for review: ${opts.projectName} (Journey ${opts.journeyNumber}) by <@${opts.slackId}>`,
