@@ -391,6 +391,7 @@ export function addUser(user: User): Promise<void> {
         admin: false,
         reviewer: false,
         journeyNumber: 1,
+        yswsEligible: user.yswsEligible,
     };
 
     if (user.birthday && user.birthday.trim()) {
@@ -862,6 +863,7 @@ export async function createProject(slackId: string, project: Project): Promise<
     if (!userRecord) {
         throw new Error("User not found");
     }
+    const yswsEligible = Boolean(userRecord.get("yswsEligible"));
     return new Promise<string>((resolve, reject) => {
         base("Projects").select({
             filterByFormula: `AND({user} = '${userRecord.id}', {journeyNumber} = ${project.journeyNumber})`
@@ -883,6 +885,7 @@ export async function createProject(slackId: string, project: Project): Promise<
                         hackatimeProject: project.hackatimeProject,
                         projectType: project.projectType,
                         journeyNumber: project.journeyNumber,
+                        yswsEligible,
                     } as any
                 },
             ],
@@ -1117,7 +1120,8 @@ export async function submitProjectForReview(slackId: string, projectId: string)
             } else {
                 normalizedYsws = Boolean(rawYsws);
             }
-            project.yswsEligible = normalizedYsws;
+            const userYswsEligible = Boolean(userRecord.get("yswsEligible"));
+            project.yswsEligible = normalizedYsws || userYswsEligible;
             if (!project.yswsEligible) {
                 reject(new Error("Project is not YSWS eligible"));
                 return;
