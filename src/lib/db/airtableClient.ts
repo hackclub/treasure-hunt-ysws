@@ -3,7 +3,7 @@ import type { AirtableFieldSet, AirtableRecord } from './airtable-types';
 const Airtable = AirtablePkg;
 import type { Item, Journey, Order, Reward, User, Submission, Project, ReviewStatistics, ReviewerStatistics } from "./models";
 import { env } from '$env/dynamic/private';
-import { joinChannel, sendUpdateDM } from "$lib/server/slack/slackClient";
+import { joinChannel, sendUpdateDM, sendReviewerChannelAlert } from "$lib/server/slack/slackClient";
 import { completeJourney } from "$lib/rewards/complete";
 import { clearCache } from "$lib/server/projectsCache";
 import { get } from "node:http";
@@ -877,6 +877,17 @@ export async function sendProjectToReview(slackId: string, journeyNumber: number
     });
     sendUpdateDM(slackId, "Project Submitted for Review", `Your project \`\`\`${HackatimeProjectName}\`\`\` has been submitted for review! You should receive feedback within 48 hours.`).catch(error => {
         console.error("Error sending project submission DM:", error);
+    });
+    sendReviewerChannelAlert("C0BETRG84UB", {
+        submissionId,
+        projectName: HackatimeProjectName,
+        journeyNumber,
+        githubUsername,
+        description,
+        aiUsage,
+        slackId,
+    }).catch(error => {
+        console.error("Error sending reviewer channel alert:", error);
     });
 
     return submissionId;
