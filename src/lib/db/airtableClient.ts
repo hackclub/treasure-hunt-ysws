@@ -16,11 +16,12 @@ function isAirtableAuthError(error: unknown): boolean {
     return statusCode === 401 || statusCode === 403;
 }
 
-function formatAirtableAuthError(operation: string): Error {
+function formatAirtableAuthError(operation: string, access: "read" | "write"): Error {
     const baseId = env.AIRTABLE_BASE_ID || "<missing base id>";
+    const accessText = access === "read" ? "read access" : "write access";
     return new Error(
         `${operation} failed because Airtable rejected the request. ` +
-        `Check that the PAT is shared with base ${baseId} and has write access to the relevant table. ` +
+        `Check that the PAT is shared with base ${baseId} and has ${accessText} to the relevant table. ` +
         `Scopes alone are not enough for Airtable PATs.`
     );
 }
@@ -810,7 +811,7 @@ export async function sendProjectToReview(slackId: string, journeyNumber: number
             },
             function done(error: any) {
                 if (error) {
-                    reject(isAirtableAuthError(error) ? formatAirtableAuthError("Checking submission history") : error);
+                    reject(isAirtableAuthError(error) ? formatAirtableAuthError("Checking submission history", "read") : error);
                     return;
                 }
                 resolve();
@@ -849,7 +850,7 @@ export async function sendProjectToReview(slackId: string, journeyNumber: number
             ],
             (error: unknown, records?: readonly AirtableRecord<AirtableFieldSet>[]) => {
                 if (error) {
-                    reject(isAirtableAuthError(error) ? formatAirtableAuthError("Submitting a project for review") : error);
+                    reject(isAirtableAuthError(error) ? formatAirtableAuthError("Submitting a project for review", "write") : error);
                     return;
                 }
                 if (!records || records.length === 0) {
@@ -883,7 +884,7 @@ export async function createProject(slackId: string, project: Project): Promise<
             filterByFormula: `AND({user} = '${userRecord.id}', {journeyNumber} = ${project.journeyNumber})`
         }).firstPage((checkErr, existing) => {
             if (checkErr) {
-                reject(isAirtableAuthError(checkErr) ? formatAirtableAuthError("Creating a project") : checkErr);
+                reject(isAirtableAuthError(checkErr) ? formatAirtableAuthError("Creating a project", "read") : checkErr);
                 return;
             }
             if (existing?.length) { reject(new Error(`Already have a project for journey ${project.journeyNumber}`)); return; }
@@ -908,7 +909,7 @@ export async function createProject(slackId: string, project: Project): Promise<
             ],
                     (error: unknown, records?: readonly AirtableRecord<AirtableFieldSet>[]) => {
                 if (error) {
-                    reject(isAirtableAuthError(error) ? formatAirtableAuthError("Creating a project") : error);
+                    reject(isAirtableAuthError(error) ? formatAirtableAuthError("Creating a project", "write") : error);
                     return;
                 }
                 if (!records || records.length === 0) {
