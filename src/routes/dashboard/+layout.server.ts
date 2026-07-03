@@ -1,10 +1,22 @@
-export async function load({ fetch, parent }) {
-  const parentData = await parent();
-  
+import { redirect } from "@sveltejs/kit";
+import { getSlackId, isUser } from "$lib/db/airtableClient";
+
+export async function load({ fetch, request }) {
+
+  const slackId = await getSlackId(request);
+  if (!slackId) {
+    throw redirect(302, "/api/login");
+  }
+
+  const registered = await isUser(slackId).catch(() => false);
+  if (!registered) {
+    throw redirect(302, "/api/login");
+  }
+
   try {
     const response = await fetch('/api/me');
     const userData = await response.json();
-    
+
     return {
       slackId: userData.slackId || '',
       displayName: userData.displayName || '',

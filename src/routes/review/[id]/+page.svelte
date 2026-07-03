@@ -94,9 +94,10 @@ const id = $page.params.id;
           trustLevel = data.trust_factor?.trust_level || stats.trust_factor?.trust_level || "";
         const projectData = stats.projects?.find((p) => p.name === project.hackatimeProject);
             if (projectData) {
-          finalHours = stats.human_readable_total || projectData.text || `${(projectData.total_seconds / 3600).toFixed(2)}h`;
-          finalHoursinHours = (projectData.total_seconds / 3600).toFixed(2);
-
+          finalHours = projectData.text || `${(projectData.total_seconds / 3600).toFixed(2)}h`;
+          finalHoursinHours = project.overrideHoursSpent != null
+            ? String(project.overrideHoursSpent)
+            : (projectData.total_seconds / 3600).toFixed(2);
             } else {
                 console.warn("Project not found in hackatime stats");
             }
@@ -123,7 +124,6 @@ const id = $page.params.id;
         projectsRequest.then(fetchedProjects => {
             projects = fetchedProjects;
           project = projects.find((item) => String(item.id) === String(id)) ?? {};
-          finalHours = project.overrideHoursSpent || "";
           slackId = project.slackId;
           if (project.user && project.hackatimeProject) {
               fetchHours();
@@ -145,10 +145,17 @@ const id = $page.params.id;
       if (submittingDecision) return;
       submittingDecision = true;
       try {
+        const payload = { projectId: id, reason: justification };
+        if (decision === "approve") {
+          const parsed = parseFloat(finalHoursinHours);
+          if (Number.isFinite(parsed) && parsed > 0) {
+            payload.overrideHours = parsed;
+          }
+        }
         const response = await fetch(`/api/review/${decision}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId: id, reason: justification }),
+          body: JSON.stringify(payload),
         });
 
         if (!response.ok) {

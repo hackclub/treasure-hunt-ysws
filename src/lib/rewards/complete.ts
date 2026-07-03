@@ -1,8 +1,6 @@
-import { journeyIdToRecordId, getJourneyById, userSlackIdToUserRecord, addToCompleters, updateJourneyNumber, getActiveExpedition, createOrder, getSubmissionBySlackId, getGoldBars, updateGoldBars } from "$lib/db/airtableClient";
+import { getJourneyById, userSlackIdToUserRecord, addToCompleters, updateJourneyNumber, getActiveExpedition, createOrder, getSubmissionForJourney, getGoldBars, updateGoldBars } from "$lib/db/airtableClient";
 
 export async function completeJourney(slackId: string, journeyNumber: number) {
-    const journeyRecordId = journeyIdToRecordId(journeyNumber);
-
     const journey = await getJourneyById(journeyNumber);
 
     if (!journey) {
@@ -42,7 +40,7 @@ export async function completeJourney(slackId: string, journeyNumber: number) {
     // fullfill general
     if (activeExpedition == 'general') {
         let itemId;
-        switch(currentJourneyNumber) {
+        switch(journeyNumber) {
             case 1: 
                 itemId = "1";
                 break;
@@ -84,7 +82,7 @@ export async function completeJourney(slackId: string, journeyNumber: number) {
     // fullfill hardware
     if (activeExpedition == 'hardware') {
         let itemId;
-        switch(currentJourneyNumber) {
+        switch(journeyNumber) {
             case 1: 
                 itemId = "12";
                 break;
@@ -126,7 +124,7 @@ export async function completeJourney(slackId: string, journeyNumber: number) {
 
     // add gold bars for completing the journey, 10 goldbars per hour after the fourth hour
     try {
-        const submission = await getSubmissionBySlackId(slackId);
+        const submission = await getSubmissionForJourney(slackId, journeyNumber);
         const hoursSpent = submission?.["Optional - Override Hours Spent"] ?? 0;
         const extraHours = Math.max(0, Math.floor(Number(hoursSpent)) - 4);
         if (extraHours > 0) {

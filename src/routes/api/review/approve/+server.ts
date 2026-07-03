@@ -11,7 +11,10 @@ export const POST: RequestHandler = async ({ request }) => {
       return new Response(JSON.stringify({ error: "projectId is required" }), { status: 400 });
     }
 
-    await approveSubmission(submissionId);
+    const overrideHours = body?.overrideHours !== undefined ? Number(body.overrideHours) : undefined;
+    const justification = typeof body?.reason === "string" && body.reason.trim() ? body.reason.trim() : undefined;
+
+    await approveSubmission(submissionId, overrideHours, justification);
     clearCache();
 
     return new Response(JSON.stringify({ status: "success", message: "Project sent to fraud review." }), { status: 200 });
