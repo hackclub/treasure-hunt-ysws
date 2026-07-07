@@ -1,9 +1,8 @@
 import { getSubmissionBySlackId, getSlackId } from "$lib/db/airtableClient";
 
 export async function GET({ request }: { request: Request }) {
-    const url = new URL(request.url);
-    const slackId = url.searchParams.get("slackId") || await getSlackId(request);
-    
+    const slackId = await getSlackId(request);
+
     if (!slackId) {
         return new Response("Missing slackId", { status: 400 });
     }

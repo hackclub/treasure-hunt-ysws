@@ -8,6 +8,11 @@ import { completeJourney } from "$lib/rewards/complete";
 import { clearCache } from "$lib/server/projectsCache";
 import { get } from "node:http";
 import { send } from "node:process";
+/** Escape a string value for safe interpolation inside an Airtable formula single-quoted string. */
+function safeStr(value: string): string {
+    return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
 const CLAIM_DURATION_MS = 30 * 60 * 1000;
 const FRAUD_EVENT_ID = process.env.FRAUD_EVENT_ID || "treasure-hunt";
 function isAirtableAuthError(error: unknown): boolean {
@@ -60,7 +65,7 @@ async function getUserRecords(slackId?: string, request?: Request): Promise<Airt
     
     return new Promise((resolve, reject) => {
         getBase()("Users")
-            .select({ filterByFormula: `{slackId} = '${id}'` })
+            .select({ filterByFormula: `{slackId} = '${safeStr(id)}'` })
             .firstPage((error: any, records: ReadonlyArray<AirtableRecord<AirtableFieldSet>> = []) => {
                 if (error) {
                     reject(error);
@@ -453,7 +458,7 @@ export async function updateGoldBars(slackId: string, newGoldBarCount: number): 
     }
     return new Promise((resolve, reject) => {
         base("Users")
-            .select({ filterByFormula: `{slackId} = '${id}'` })
+            .select({ filterByFormula: `{slackId} = '${safeStr(id)}'` })
             .firstPage((error, records: readonly AirtableRecord<AirtableFieldSet>[] = []) => {
                 if (error) {
                     reject(error);
@@ -495,7 +500,7 @@ export async function updateJourneyNumber(slackId: string, newJourneyNumber: num
     }
     return new Promise((resolve, reject) => {
         base("Users")
-            .select({ filterByFormula: `{slackId} = '${id}'` })
+            .select({ filterByFormula: `{slackId} = '${safeStr(id)}'` })
             .firstPage((error, records: readonly AirtableRecord<AirtableFieldSet>[] = []) => {
                 if (error) {
                     reject(error);
@@ -539,7 +544,7 @@ export async function createItem(name: string, description: string, price: numbe
 export async function deleteItem(itemName: string): Promise<void> {
     return new Promise((resolve, reject) => {
         base("Items")
-            .select({ filterByFormula: `{name} = '${itemName}'` })
+            .select({ filterByFormula: `{name} = '${safeStr(itemName)}'` })
             .firstPage((error, records) => {
                 if (error) {
                     reject(error);
@@ -614,7 +619,7 @@ export async function getOrders(request: Request): Promise<Record<string, Omit<O
     return new Promise((resolve, reject) => {
         const results: Record<string, Omit<Order, 'id'>> = {};
         base("Orders").select({
-            filterByFormula: `{slackId} = '${slackId}'`
+            filterByFormula: `{slackId} = '${safeStr(slackId)}'`
         }).eachPage(
             function page(records: ReadonlyArray<AirtableRecord<AirtableFieldSet>>, fetchNextPage: () => void) {
                 for (const record of records) {
@@ -648,7 +653,7 @@ export async function getOrders(request: Request): Promise<Record<string, Omit<O
 export async function createOrder(order: Omit<Order, 'id'>): Promise<void> {
     return new Promise((resolve, reject) => {
         base("Users").select({
-            filterByFormula: `{slackId} = '${order.slackId}'`
+            filterByFormula: `{slackId} = '${safeStr(order.slackId)}'`
         }).firstPage((error, records) => {
             if (error) {
                 reject(error);
@@ -662,7 +667,7 @@ export async function createOrder(order: Omit<Order, 'id'>): Promise<void> {
             
             // look up item by custom id field to get record id
             base("Items").select({
-                filterByFormula: `{id} = '${order.itemId}'`
+                filterByFormula: `{id} = '${safeStr(order.itemId)}'`
             }).firstPage((itemError, itemRecords) => {
                 if (itemError) {
                     reject(itemError);
@@ -763,7 +768,7 @@ export async function getJourneyById(journeyId?: number, journeyRecordId?: strin
 export async function userSlackIdToUserRecord(slackId: string): Promise<AirtableRecord<AirtableFieldSet> | null> { // deprecated
     return new Promise((resolve, reject) => {
         base("Users").select({
-            filterByFormula: `{slackId} = '${slackId}'`
+            filterByFormula: `{slackId} = '${safeStr(slackId)}'`
         }).firstPage((error, records) => {
             if (error) {
                 reject(error);
@@ -813,7 +818,7 @@ export async function sendProjectToReview(slackId: string, journeyNumber: number
     const activeSubmissions: Submission[] = [];
     await new Promise<void>((resolve, reject) => {
         base("Submissions").select({
-            filterByFormula: `{Slack ID} = '${slackId}'`
+            filterByFormula: `{Slack ID} = '${safeStr(slackId)}'`
         }).eachPage(
             function page(records: ReadonlyArray<AirtableRecord<AirtableFieldSet>>, fetchNextPage: () => void) {
                 activeSubmissions.push(...records.map(submissionRecordToSubmission));
@@ -901,7 +906,7 @@ export async function createProject(slackId: string, project: Project): Promise<
     }
     return new Promise<string>((resolve, reject) => {
         base("Projects").select({
-            filterByFormula: `AND({user} = '${userRecord.id}', {journeyNumber} = ${project.journeyNumber})`
+            filterByFormula: `AND({user} = '${safeStr(userRecord.id)}', {journeyNumber} = ${project.journeyNumber})`
         }).firstPage((checkErr, existing) => {
             if (checkErr) {
                 reject(isAirtableAuthError(checkErr) ? formatAirtableAuthError("Creating a project", "read") : checkErr);
@@ -1275,7 +1280,7 @@ export async function getJourneyLetter(journeyId: number): Promise<string | null
 export async function getSubmissionBySlackId(slackId: string): Promise<Submission | null> {
     return new Promise((resolve, reject) => {
         base("Submissions").select({
-            filterByFormula: `{Slack ID} = '${slackId}'`
+            filterByFormula: `{Slack ID} = '${safeStr(slackId)}'`
         }).firstPage((error, records: ReadonlyArray<AirtableRecord<AirtableFieldSet>> = []) => {
             if (error) {
                 reject(error);
@@ -1293,7 +1298,7 @@ export async function getSubmissionBySlackId(slackId: string): Promise<Submissio
 export async function getSubmissionForJourney(slackId: string, journeyNumber: number): Promise<Submission | null> {
     return new Promise((resolve, reject) => {
         base("Submissions").select({
-            filterByFormula: `AND({Slack ID} = '${slackId}', {journeyNumber} = ${journeyNumber})`
+            filterByFormula: `AND({Slack ID} = '${safeStr(slackId)}', {journeyNumber} = ${journeyNumber})`
         }).firstPage((error, records: ReadonlyArray<AirtableRecord<AirtableFieldSet>> = []) => {
             if (error) {
                 reject(error);
