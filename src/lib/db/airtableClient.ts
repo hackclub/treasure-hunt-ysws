@@ -1674,6 +1674,49 @@ function findSubmissionRecord(submissionId: string): Promise<AirtableRecord<Airt
     });
 }
 
+function findProjectRecordForSubmission(submissionRecord: AirtableRecord<AirtableFieldSet>): Promise<AirtableRecord<AirtableFieldSet> | null> {
+    const journeyNumber = submissionRecord.get("journeyNumber") as number | undefined;
+    if (journeyNumber === undefined || !Number.isFinite(journeyNumber)) {
+        return Promise.resolve(null);
+    }
+    const submissionUserId = getFirstOrDefault(submissionRecord.get("User"));
+
+    return new Promise((resolve, reject) => {
+        const collected: AirtableRecord<AirtableFieldSet>[] = [];
+        base("Projects").select({
+            filterByFormula: `{journeyNumber} = ${journeyNumber}`
+        }).eachPage(
+            (records: ReadonlyArray<AirtableRecord<AirtableFieldSet>>, fetchNextPage: () => void) => {
+                collected.push(...records);
+                fetchNextPage();
+            },
+            (error: any) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                const linked = collected.find((record) => {
+                    const submissions = record.get("submission") as string[] | undefined;
+                    return Array.isArray(submissions) && submissions.includes(submissionRecord.id);
+                });
+                if (linked) {
+                    resolve(linked);
+                    return;
+                }
+                // submitProjectForReview resolves even when the submission link fails to write,
+                // so fall back to the one project this user has for the journey.
+                const owned = submissionUserId
+                    ? collected.find((record) => {
+                        const users = record.get("user") as string[] | undefined;
+                        return Array.isArray(users) && users.includes(submissionUserId);
+                    })
+                    : undefined;
+                resolve(owned ?? null);
+            }
+        );
+    });
+}
+
 export async function claimSubmission(submissionId: string, adminSlackId: string): Promise<void> {
     // claim the submission for 30 minutes, preventing other admins from reviewing it while it's being reviewed
     return new Promise<void>((resolve, reject) => {
@@ -1849,6 +1892,46 @@ export async function rejectSubmission(submissionId: string): Promise<void> {
     });
 }
 
+/** Reject from the reviewer dashboard, which identifies a review by its Submissions record id. */
+export async function rejectSubmissionForReview(submissionId: string, rejectionReason: string): Promise<void> {
+    const submissionRecord = await findSubmissionRecord(submissionId);
+    if (!submissionRecord) {
+        throw new Error("Submission not found");
+    }
+
+    // Projects.status is computed from Submissions.status, so this write is what rejects the project.
+    await new Promise<void>((resolve, reject) => {
+        base("Submissions").update(submissionRecord.id, { status: "rejected" }, (updateError: any) => {
+            if (updateError) {
+                reject(updateError);
+                return;
+            }
+            resolve();
+        });
+    });
+
+    const projectRecord = await findProjectRecordForSubmission(submissionRecord);
+    if (projectRecord) {
+        await new Promise<void>((resolve, reject) => {
+            base("Projects").update(projectRecord.id, { rejectionReason }, (updateError: any) => {
+                if (updateError) {
+                    reject(updateError);
+                    return;
+                }
+                resolve();
+            });
+        });
+    }
+
+    const journeyNumber = submissionRecord.get("journeyNumber") as number | undefined;
+    const slackId = getFirstOrDefault(submissionRecord.get("Slack ID"));
+    if (slackId) {
+        sendUpdateDM(slackId, "Project Not Approved", `Your Journey ${journeyNumber} project was not approved. Reason: ${rejectionReason}`).catch(err => {
+            console.error("Error sending rejection DM:", err);
+        });
+    }
+}
+
 export async function checkFraudStatus(submissionId: string): Promise<{ status: string; reason: string | null }> {
     return new Promise<{ status: string; reason: string | null }>((resolve, reject) => {
         findSubmissionRecord(submissionId).then((record) => {
@@ -2000,53 +2083,6 @@ async function approveProject(projectId: string): Promise<void> {
                 })
                 .then(() => resolve())
                 .catch(reject);
-        });
-    });
-}
-
-export async function updateProjectReviewOutcome(projectId: string, status: "approved" | "rejected", rejectionReason: string = ""): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-        // Projects.status is computed from Submissions.status — only write rejectionReason
-        base("Projects").update(projectId, {
-            rejectionReason: status === "rejected" ? rejectionReason : "",
-        }, (updateError: any) => {
-            if (updateError) {
-                reject(updateError);
-                return;
-            }
-            if (status !== "rejected") {
-                resolve();
-                return;
-            }
-            base("Projects").find(projectId, (findError: unknown, record?: AirtableRecord<AirtableFieldSet>) => {
-                if (findError || !record) {
-                    resolve();
-                    return;
-                }
-                const submissionId = getFirstOrDefault(record.get("submission"));
-                if (submissionId) {
-                    rejectSubmission(submissionId).catch(err => {
-                        console.error("Error rejecting linked submission:", err);
-                    });
-                }
-                const linkedUsers = record.get("user") as string[] | undefined;
-                const userRecordId = Array.isArray(linkedUsers) ? linkedUsers[0] : undefined;
-                const journeyNumber = record.get("journeyNumber") as number | undefined;
-                if (!userRecordId) {
-                    resolve();
-                    return;
-                }
-                userRecordIdToSlackId(userRecordId)
-                    .then((slackId) => {
-                        if (slackId) {
-                            sendUpdateDM(slackId, "Project Not Approved", `Your Journey ${journeyNumber} project was not approved. Reason: ${rejectionReason}`).catch(err => {
-                                console.error("Error sending rejection DM:", err);
-                            });
-                        }
-                        resolve();
-                    })
-                    .catch(() => resolve());
-            });
         });
     });
 }

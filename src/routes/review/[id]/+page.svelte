@@ -140,9 +140,15 @@ const id = $page.params.id;
         };
 
     let submittingDecision = $state(false);
+    let decisionError = $state("");
 
     const submitDecision = async (decision) => {
       if (submittingDecision) return;
+      decisionError = "";
+      if (decision === "reject" && !justification.trim()) {
+        decisionError = "A justification is required to reject a project.";
+        return;
+      }
       submittingDecision = true;
       try {
         const payload = { projectId: id, reason: justification };
@@ -159,12 +165,14 @@ const id = $page.params.id;
         });
 
         if (!response.ok) {
-          throw new Error(await response.text());
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.error || `Request failed with status ${response.status}`);
         }
 
         window.location.href = "/review";
       } catch (error) {
         console.error(`Error submitting ${decision}:`, error);
+        decisionError = error instanceof Error ? error.message : String(error);
       } finally {
         submittingDecision = false;
       }
@@ -297,6 +305,14 @@ const id = $page.params.id;
         <button type="button" aria-label="Chest" title="Chest" style="width: 50px; height: 50px; border: 4px solid #1B2D48; border-radius: 9999px; background: #E8D5A0 url('/assets/Chest%20-%20side.webp') center / 66px no-repeat; cursor: pointer; flex: 0 0 50px; transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;" onmouseenter={(event) => { event.currentTarget.style.transform = "translateY(-2px)"; event.currentTarget.style.boxShadow = "0 6px 0 #1B2D48"; event.currentTarget.style.filter = "brightness(1.05)"; }} onmouseleave={(event) => { event.currentTarget.style.transform = "translateY(0)"; event.currentTarget.style.boxShadow = "none"; event.currentTarget.style.filter = "none"; }}></button>
       </div>
     </foreignObject>
+
+    {#if decisionError}
+      <foreignObject x="140" y="1360" width="700" height="60">
+        <div xmlns="http://www.w3.org/1999/xhtml" role="alert" style="background: #EC3750; border: 3px solid #1B2D48; border-radius: 8px; padding: 8px 12px; font-family: sans-serif; font-weight: 900; font-size: 13px; color: #F3E1AD;">
+          {decisionError}
+        </div>
+      </foreignObject>
+    {/if}
 
     <foreignObject x="340" y="1065" width="60%" height="250">
       <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex; align-items:center; justify-content:center; height:100%;">

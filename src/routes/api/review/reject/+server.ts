@@ -1,14 +1,14 @@
 import type { RequestHandler } from "@sveltejs/kit";
-import { updateProjectReviewOutcome } from "$lib/db/airtableClient";
+import { rejectSubmissionForReview } from "$lib/db/airtableClient";
 import { clearCache } from "$lib/server/projectsCache";
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const body = await request.json();
-    const projectId = String(body?.projectId || "").trim();
+    const submissionId = String(body?.projectId || "").trim();
     const reason = String(body?.reason || "").trim();
 
-    if (!projectId) {
+    if (!submissionId) {
       return new Response(JSON.stringify({ error: "projectId is required" }), { status: 400 });
     }
 
@@ -16,7 +16,7 @@ export const POST: RequestHandler = async ({ request }) => {
       return new Response(JSON.stringify({ error: "reason is required" }), { status: 400 });
     }
 
-    await updateProjectReviewOutcome(projectId, "rejected", reason);
+    await rejectSubmissionForReview(submissionId, reason);
 
     clearCache();
 
