@@ -2,6 +2,7 @@
 import { onMount } from "svelte";
 import { page } from "$app/stores";
     import { DisplayName } from "hackclub-forms";
+    import { parseRejectionHistory, formatRejectionDate } from "$lib/rejectionHistory";
 const id = $page.params.id;
     // The data coming from your server or API
 //    let projects = [
@@ -30,6 +31,9 @@ const id = $page.params.id;
     let claimBusy = $state(false);
     let claimClock = $state(Date.now());
     let showDisplayName = $state(false);
+
+    // Past rejections of this project, newest first. Empty on a first submission.
+    const rejections = $derived(parseRejectionHistory(project.rejectionHistory));
 
     const isClaimedByMe = () => Boolean(claimedBy) && claimedBy === currentSlackId;
     const isLocked = () => Boolean(claimedBy) && !isClaimedByMe();
@@ -180,6 +184,24 @@ const id = $page.params.id;
 </script>
 
 <form action="?/review" method="POST" style="width: 100%; max-width: 1000px; margin: 20px auto; filter: drop-shadow(10px 10px 0px rgba(27, 45, 72, 0.15)); position: relative;">
+  {#if rejections.length}
+    <div style="background: #F3E1AD; border: 4px solid #EC3750; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; color: #1B2D48;">
+      <h3 style="margin: 0 0 8px 0; font-family: sans-serif; font-size: 14px; font-weight: 900; color: #EC3750;">
+        PREVIOUSLY REJECTED {rejections.length} {rejections.length === 1 ? "TIME" : "TIMES"}
+      </h3>
+      <div style="max-height: 240px; overflow-y: auto;">
+        {#each rejections as entry, index}
+          <div style={`padding: 8px 0; ${index > 0 ? "border-top: 2px dashed rgba(27, 45, 72, 0.25);" : ""}`}>
+            <div style="font-family: sans-serif; font-size: 11px; font-weight: 900; color: #1B2D48; opacity: 0.6; margin-bottom: 4px;">
+              {index === 0 ? "MOST RECENT" : `ATTEMPT ${rejections.length - index}`} · {formatRejectionDate(entry.at)}
+            </div>
+            <div style="font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word;">{entry.reason}</div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+  <div style="position: relative;">
   <button type="button" onclick={toggleClaim} disabled={isLocked() || claimBusy} style="position: absolute; top: 55px; right: 70px; z-index: 3; width: 220px; height: 45px; background: #FFB400; border: 3px solid #1B2D48; border-radius: 8px; font-family: 'Comic Sans MS', sans-serif; font-weight: 900; cursor: pointer; box-shadow: 0 4px 0 #1B2D48;">
     {claimBusy ? "..." : claimButtonLabel()}
   </button>
@@ -320,6 +342,7 @@ const id = $page.params.id;
       </div>
     </foreignObject>
   </svg>
+  </div>
   </div>
 </form>
 

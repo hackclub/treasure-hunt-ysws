@@ -18,7 +18,9 @@ export async function load({ fetch, params }) {
         codeUrl: p.codeUrl || '',
         readmeUrl: p.readmeUrl || '',
         demoUrl: p.demoUrl || '',
-        aiUsage: p.aiUsage || ''
+        aiUsage: p.aiUsage || '',
+        status: p.status || '',
+        rejectionReason: p.rejectionReason || ''
       };
     }
     

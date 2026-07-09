@@ -6,6 +6,7 @@ import { env } from '$env/dynamic/private';
 import { joinChannel, sendUpdateDM, sendReviewerChannelAlert } from "$lib/server/slack/slackClient";
 import { completeJourney } from "$lib/rewards/complete";
 import { clearCache } from "$lib/server/projectsCache";
+import { appendRejectionReason } from "$lib/rejectionHistory";
 import { get } from "node:http";
 import { send } from "node:process";
 /** Escape a string value for safe interpolation inside an Airtable formula single-quoted string. */
@@ -833,10 +834,26 @@ export async function sendProjectToReview(slackId: string, journeyNumber: number
             }
         );
     });
-    if (activeSubmissions.some((submission) => submission.status === "rejected")) {
+    // Resubmitting creates a new Submissions record, so a journey accumulates one row per attempt.
+    // Only the newest attempt per journey says where that project stands today; older rejected rows
+    // are history and must not block the resubmission they asked the user to make.
+    const latestByJourney = new Map<number, Submission>();
+    for (const submission of activeSubmissions) {
+        const journeyOfSubmission = Number(submission.journeyNumber);
+        if (!Number.isFinite(journeyOfSubmission)) continue;
+        const current = latestByJourney.get(journeyOfSubmission);
+        if (!current || (Number(submission.id) || 0) >= (Number(current.id) || 0)) {
+            latestByJourney.set(journeyOfSubmission, submission);
+        }
+    }
+
+    const rejectedElsewhere = [...latestByJourney.entries()].some(
+        ([journeyOfSubmission, submission]) => submission.status === "rejected" && journeyOfSubmission !== journeyNumber
+    );
+    if (rejectedElsewhere) {
         throw new Error("One of your projects was rejected. Please update your project and resubmit it before submitting another project.");
     }
-    if (activeSubmissions.some((submission) => submission.status === "unreviewed")) {
+    if ([...latestByJourney.values()].some((submission) => submission.status === "unreviewed")) {
         throw new Error("You already have a project in review. Please wait for it to be reviewed before submitting another project.");
     }
     const journey = await getJourneyById(journeyNumber);
@@ -1520,6 +1537,25 @@ async function getAllProjectRecords(): Promise<AirtableRecord<AirtableFieldSet>[
     });
 }
 
+/**
+ * Rejection history for every project, keyed `${userRecordId}:${journeyNumber}` — the pair a
+ * Submissions row carries, since a project links only to its newest submission.
+ */
+export async function getProjectRejectionHistories(): Promise<Record<string, string>> {
+    const records = await getAllProjectRecords();
+    const histories: Record<string, string> = {};
+    for (const record of records) {
+        const history = ((record.get("rejectionReason") as string | undefined) || "").trim();
+        if (!history) continue;
+        const linkedUsers = record.get("user") as string[] | undefined;
+        const userRecordId = Array.isArray(linkedUsers) ? linkedUsers[0] : undefined;
+        const journeyNumber = record.get("journeyNumber");
+        if (!userRecordId || journeyNumber === undefined || journeyNumber === null) continue;
+        histories[`${userRecordId}:${journeyNumber}`] = history;
+    }
+    return histories;
+}
+
 function normalizeStatus(status: unknown): string {
     return String(status || "").trim().toLowerCase();
 }
@@ -1892,6 +1928,31 @@ export async function rejectSubmission(submissionId: string): Promise<void> {
     });
 }
 
+/** Prepend a reason to the project's rejection history. Returns the stored history. */
+async function appendProjectRejectionReason(projectId: string, rejectionReason: string): Promise<string> {
+    const record = await new Promise<AirtableRecord<AirtableFieldSet>>((resolve, reject) => {
+        base("Projects").find(projectId, (findError: any, found?: AirtableRecord<AirtableFieldSet>) => {
+            if (findError || !found) {
+                reject(findError ?? new Error("Project not found"));
+                return;
+            }
+            resolve(found);
+        });
+    });
+
+    const history = appendRejectionReason(record.get("rejectionReason") as string | undefined, rejectionReason);
+    await new Promise<void>((resolve, reject) => {
+        base("Projects").update(projectId, { rejectionReason: history }, (updateError: any) => {
+            if (updateError) {
+                reject(updateError);
+                return;
+            }
+            resolve();
+        });
+    });
+    return history;
+}
+
 /** Reject from the reviewer dashboard, which identifies a review by its Submissions record id. */
 export async function rejectSubmissionForReview(submissionId: string, rejectionReason: string): Promise<void> {
     const submissionRecord = await findSubmissionRecord(submissionId);
@@ -1912,15 +1973,7 @@ export async function rejectSubmissionForReview(submissionId: string, rejectionR
 
     const projectRecord = await findProjectRecordForSubmission(submissionRecord);
     if (projectRecord) {
-        await new Promise<void>((resolve, reject) => {
-            base("Projects").update(projectRecord.id, { rejectionReason }, (updateError: any) => {
-                if (updateError) {
-                    reject(updateError);
-                    return;
-                }
-                resolve();
-            });
-        });
+        await appendProjectRejectionReason(projectRecord.id, rejectionReason);
     }
 
     const journeyNumber = submissionRecord.get("journeyNumber") as number | undefined;
@@ -1932,8 +1985,8 @@ export async function rejectSubmissionForReview(submissionId: string, rejectionR
     }
 }
 
-export async function checkFraudStatus(submissionId: string): Promise<{ status: string; reason: string | null }> {
-    return new Promise<{ status: string; reason: string | null }>((resolve, reject) => {
+export async function checkFraudStatus(submissionId: string): Promise<{ status: string; rejectionReason: string | null }> {
+    return new Promise<{ status: string; rejectionReason: string | null }>((resolve, reject) => {
         findSubmissionRecord(submissionId).then((record) => {
             if (!record) {
                 reject(new Error("Submission not found"));
@@ -1944,17 +1997,17 @@ export async function checkFraudStatus(submissionId: string): Promise<{ status: 
             const submissionJourneyNumber = record.get("journeyNumber") as number | undefined;
 
             if (!submissionUserId || !submissionJourneyNumber) {
-                resolve({ status: "pending", reason: null });
+                resolve({ status: "pending", rejectionReason: null });
                 return;
             }
 
             const apiKey = getFraudApiKey();
             if (!apiKey) {
-                resolve({ status: "pending", reason: null });
+                resolve({ status: "pending", rejectionReason: null });
                 return;
             }
 
-            const updateMatchedProject = (status: "approved" | "rejected", rejectionReason: string = "") => {
+            const updateMatchedProject = (status: "approved" | "rejected", reason: string = "") => {
                 base("Projects").select({
                     filterByFormula: `{journeyNumber} = ${submissionJourneyNumber}`
                 }).firstPage((projectErr, projectRecords: ReadonlyArray<AirtableRecord<AirtableFieldSet>> = []) => {
@@ -1968,25 +2021,32 @@ export async function checkFraudStatus(submissionId: string): Promise<{ status: 
                         return Array.isArray(users) && users.includes(submissionUserId);
                     });
                     if (!projectRecord) {
-                        resolve({ status: "pending", reason: null });
+                        resolve({ status: "pending", rejectionReason: null });
                         return;
                     }
 
+                    // Already synced — hand back the stored history rather than re-recording the reason.
                     const currentProjectStatus = projectRecord.get("status") as string | undefined;
                     if (currentProjectStatus === status) {
-                        resolve({ status, reason: status === "rejected" ? rejectionReason : null });
+                        const stored = (projectRecord.get("rejectionReason") as string | undefined) || null;
+                        resolve({ status, rejectionReason: status === "rejected" ? stored : null });
                         return;
                     }
 
-                    const updater = status === "approved" ? approveProject : rejectProject;
-                    const args = status === "approved"
-                        ? [projectRecord.id]
-                        : [projectRecord.id, rejectionReason];
+                    if (status === "approved") {
+                        approveProject(projectRecord.id)
+                            .then(() => {
+                                clearCache();
+                                resolve({ status, rejectionReason: null });
+                            })
+                            .catch(reject);
+                        return;
+                    }
 
-                    (updater as (...parameters: any[]) => Promise<void>)(...args)
-                        .then(() => {
+                    rejectProject(projectRecord.id, reason)
+                        .then((history) => {
                             clearCache();
-                            resolve({ status, reason: status === "rejected" ? rejectionReason : null });
+                            resolve({ status, rejectionReason: history });
                         })
                         .catch(reject);
                 });
@@ -2003,7 +2063,7 @@ export async function checkFraudStatus(submissionId: string): Promise<{ status: 
                 .then(async (response) => {
                     if (!response.ok) {
                         if (isFraudAuthFailure(response.status)) {
-                            resolve({ status: "pending", reason: null });
+                            resolve({ status: "pending", rejectionReason: null });
                             return;
                         }
                         reject(new Error(`Failed to check fraud status: ${response.status} ${response.statusText}`));
@@ -2013,7 +2073,7 @@ export async function checkFraudStatus(submissionId: string): Promise<{ status: 
                     const projects = Array.isArray(data?.projects) ? data.projects : [];
                     const project = projects.find((item: any) => item.organizerPlatformId === record.id);
                     if (!project) {
-                        resolve({ status: "pending", reason: null });
+                        resolve({ status: "pending", rejectionReason: null });
                         return;
                     }
                     const outcomeStatus = project.outcome?.status || project.status || "pending";
@@ -2027,10 +2087,10 @@ export async function checkFraudStatus(submissionId: string): Promise<{ status: 
                         return;
                     }
 
-                    resolve({ status: String(outcomeStatus), reason: null });
+                    resolve({ status: String(outcomeStatus), rejectionReason: null });
                 })
                 .catch((error) => {
-                    resolve({ status: "pending", reason: null });
+                    resolve({ status: "pending", rejectionReason: null });
                 });
         }).catch((error) => {
             reject(error);
@@ -2060,10 +2120,7 @@ async function approveProject(projectId: string): Promise<void> {
                   })
                 : Promise.resolve();
 
-            // clear rejectionReason (writable) fire-and-forget
-            base("Projects").update(projectId, { rejectionReason: "" }, (err: any) => {
-                if (err) console.error("Error clearing rejectionReason:", err);
-            });
+            // rejectionReason is kept as an audit trail, not cleared on approval
 
             updateSubmission
                 .then(() => {
@@ -2087,43 +2144,40 @@ async function approveProject(projectId: string): Promise<void> {
     });
 }
 
-async function rejectProject(projectId: string, rejectionReason: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-        // Projects.status is computed from Submissions.status — only write rejectionReason
-        base("Projects").update(projectId, { rejectionReason }, (updateError: any) => {
-            if (updateError) {
-                reject(updateError);
+/** Returns the project's full rejection history after the new reason is recorded. */
+async function rejectProject(projectId: string, rejectionReason: string): Promise<string> {
+    // Projects.status is computed from Submissions.status — only write rejectionReason
+    const history = await appendProjectRejectionReason(projectId, rejectionReason);
+
+    return new Promise<string>((resolve) => {
+        base("Projects").find(projectId, (findError: unknown, record?: AirtableRecord<AirtableFieldSet>) => {
+            if (findError || !record) {
+                resolve(history);
                 return;
             }
-            base("Projects").find(projectId, (findError: unknown, record?: AirtableRecord<AirtableFieldSet>) => {
-                if (findError || !record) {
-                    resolve();
-                    return;
-                }
-                const submissionId = getFirstOrDefault(record.get("submission"));
-                if (submissionId) {
-                    rejectSubmission(submissionId).catch(err => {
-                        console.error("Error rejecting linked submission:", err);
-                    });
-                }
-                const linkedUsers = record.get("user") as string[] | undefined;
-                const userRecordId = Array.isArray(linkedUsers) ? linkedUsers[0] : undefined;
-                const journeyNumber = record.get("journeyNumber") as number | undefined;
-                if (!userRecordId) {
-                    resolve();
-                    return;
-                }
-                userRecordIdToSlackId(userRecordId)
-                    .then((slackId) => {
-                        if (slackId) {
-                            sendUpdateDM(slackId, "Project Not Approved", `Your Journey ${journeyNumber} project was not approved. Reason: ${rejectionReason}`).catch(err => {
-                                console.error("Error sending rejection DM:", err);
-                            });
-                        }
-                        resolve();
-                    })
-                    .catch(() => resolve());
-            });
+            const submissionId = getFirstOrDefault(record.get("submission"));
+            if (submissionId) {
+                rejectSubmission(submissionId).catch(err => {
+                    console.error("Error rejecting linked submission:", err);
+                });
+            }
+            const linkedUsers = record.get("user") as string[] | undefined;
+            const userRecordId = Array.isArray(linkedUsers) ? linkedUsers[0] : undefined;
+            const journeyNumber = record.get("journeyNumber") as number | undefined;
+            if (!userRecordId) {
+                resolve(history);
+                return;
+            }
+            userRecordIdToSlackId(userRecordId)
+                .then((slackId) => {
+                    if (slackId) {
+                        sendUpdateDM(slackId, "Project Not Approved", `Your Journey ${journeyNumber} project was not approved. Reason: ${rejectionReason}`).catch(err => {
+                            console.error("Error sending rejection DM:", err);
+                        });
+                    }
+                    resolve(history);
+                })
+                .catch(() => resolve(history));
         });
     });
 }

@@ -1,4 +1,6 @@
 <script>
+    import { latestRejectionReason } from "$lib/rejectionHistory";
+
     let { number, create = false, project = null, big = false, locked = true } = $props();
     const normalizedStatus = () => String(project?.status || '').trim().toUpperCase();
     const projectStatusColor = () => ({
@@ -22,6 +24,11 @@
     const projectDescription = () => {
         const description = project?.description || 'No description available';
         return description.length > 23 ? `${description.slice(0, 23)}...` : description;
+    };
+    // The stored value is the full history; the card has room for the newest reason on one line.
+    const latestRejection = () => {
+        const reason = latestRejectionReason(project?.rejectionReason).replace(/\s+/g, ' ').trim();
+        return reason.length > 30 ? `${reason.slice(0, 30)}...` : reason;
     };
 </script>
 
@@ -64,8 +71,8 @@
 
            <!-- Status Label -->
         <text x={statusX()} y="145" font-family="monospace" font-weight="900" font-size="14" fill={projectStatusColor()}>{project?.status || 'UNSHIPPED'}</text>
-        {#if normalizedStatus() === 'REJECTED' && project?.rejectionReason}
-            <text x={statusX()} y="165" font-family="monospace" font-weight="700" font-size="11" fill="#1B2D48">{project.rejectionReason}</text>
+        {#if normalizedStatus() === 'REJECTED' && latestRejection()}
+            <text x={statusX()} y="165" font-family="monospace" font-weight="700" font-size="11" fill="#1B2D48">{latestRejection()}</text>
         {/if}
 
         </g>
@@ -83,8 +90,8 @@
 
            <!-- Status Label -->
         <text x={statusX()} y="145" font-family="monospace" font-weight="900" font-size="14" fill={projectStatusColor()}>{project?.status || 'UNSHIPPED'}</text>
-        {#if normalizedStatus() === 'REJECTED' && project?.rejectionReason}
-            <text x={statusX()} y="165" font-family="monospace" font-weight="700" font-size="11" fill="#1B2D48">{project.rejectionReason}</text>
+        {#if normalizedStatus() === 'REJECTED' && latestRejection()}
+            <text x={statusX()} y="165" font-family="monospace" font-weight="700" font-size="11" fill="#1B2D48">{latestRejection()}</text>
         {/if}
 
         </g>

@@ -15,8 +15,8 @@ async function fetchAndGroupProjects(request: Request) {
       project.status = fraudStatus.status === "approved" || fraudStatus.status === "rejected"
         ? fraudStatus.status as "approved" | "rejected"
         : project.status;
-      if (fraudStatus.reason) {
-        project.rejectionReason = fraudStatus.reason;
+      if (fraudStatus.rejectionReason) {
+        project.rejectionReason = fraudStatus.rejectionReason;
       }
     } catch (error) {
       console.error(`Error syncing fraud status for project ${project.id}:`, error);

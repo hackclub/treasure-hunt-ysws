@@ -1,13 +1,17 @@
-import { getPendingSubmissions } from "$lib/db/airtableClient";
+import { getPendingSubmissions, getProjectRejectionHistories } from "$lib/db/airtableClient";
 
 export async function GET() {
     try {
-        const pendingSubmissions = await getPendingSubmissions();
+        const [pendingSubmissions, rejectionHistories] = await Promise.all([
+            getPendingSubmissions(),
+            getProjectRejectionHistories(),
+        ]);
 
         const projects = pendingSubmissions.map((s: any) => {
             const hackatimeProject = s["hackatime project"] || s["Hackatime Project name"] || "";
 
             return {
+                rejectionHistory: rejectionHistories[`${s["User"]}:${s.journeyNumber}`] || "",
                 id: String(s.recordId),
                 projectName: hackatimeProject,
                 description: s["Description"] || "",

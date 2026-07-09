@@ -6,6 +6,7 @@
   import { HackatimeProjects } from "hackclub-forms";
   import { createUploader } from "$lib/utils/uploadthing.js";
   import { UploadDropzone } from "@uploadthing/svelte";
+  import { parseRejectionHistory, formatRejectionDate } from "$lib/rejectionHistory";
 
   let screenshotUrl = $state('');
   const uploader = createUploader("imageUploader", {
@@ -23,6 +24,8 @@
     const journey = $derived(Number(get(page).params.journey));
     const projects = $derived(data.projects);
     const errorMessage = $derived(data.error);
+    const isRejected = $derived(String(data?.projectData?.status || '').trim().toUpperCase() === 'REJECTED');
+    const rejections = $derived(parseRejectionHistory(data?.projectData?.rejectionReason));
 
     // Initialize form fields as empty
     let hackatimeProjectValue = $state('');
@@ -143,6 +146,24 @@
 
 
 <div style="width: 100%; max-width: 800px; margin: 20px auto; filter: drop-shadow(8px 8px 0px rgba(27, 45, 72, 0.15)); position: relative;">
+  {#if isRejected && rejections.length}
+    <div style="background: #F3E1AD; border: 4px solid #D32F2F; border-radius: 18px 8px 20px 10px; padding: 14px 18px; margin-bottom: 12px; color: #1B2D48;">
+      <div style="font-family: 'Luckiest Guy', cursive; font-weight: 900; font-size: 18px; color: #D32F2F; margin-bottom: 6px;">
+        YOUR PROJECT WAS REJECTED{#if rejections.length > 1} &middot; {rejections.length} TIMES{/if}
+      </div>
+      <div style="max-height: 260px; overflow-y: auto;">
+        {#each rejections as entry, index}
+          <div style={`padding: 8px 0; ${index > 0 ? 'border-top: 2px dashed rgba(27, 45, 72, 0.25);' : ''}`}>
+            <div style="font-family: 'Luckiest Guy', cursive; font-size: 12px; color: #1B2D48; opacity: 0.7; margin-bottom: 4px;">
+              {index === 0 ? 'MOST RECENT' : formatRejectionDate(entry.at).toUpperCase()}{#if index === 0 && entry.at} &middot; {formatRejectionDate(entry.at).toUpperCase()}{/if}
+            </div>
+            <div style="font-family: monospace; font-size: 14px; white-space: pre-wrap; word-break: break-word;">{entry.reason}</div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+  <div style="position: relative;">
   <svg viewBox="0 0 800 1200" xmlns="http://www.w3.org/2000/svg">
     <!-- Main Form Scroll (Closed Path) -->
     <path d="M40,50 Q60,20 200,30 L600,20 Q760,30 750,110 L770,1110 Q740,1190 590,1180 L160,1200 Q40,1190 55,1060 L30,310 Q25,70 40,50 Z" 
@@ -291,5 +312,6 @@
       <option value="Other">Other</option>
     </select>
     <input bind:value={projectTypeOther} placeholder="If Other, specify" hidden={projectType !== 'Other'} style="width:100%; height:40px; display:block; background:#E8D5A0; border:2px solid #1B2D48; border-radius:8px; padding:0 10px; box-sizing:border-box; margin-top:8px;" />
+  </div>
   </div>
 </div>
