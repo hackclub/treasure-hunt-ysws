@@ -1985,6 +1985,139 @@ export async function rejectSubmissionForReview(submissionId: string, rejectionR
     }
 }
 
+/**
+ * Fetch every project for the event from the fraud API.
+ * Returns [] when the API key is missing or the key is not authorised (401/403),
+ * so callers degrade gracefully. Throws on other network/HTTP failures.
+ */
+async function fetchFraudProjects(): Promise<any[]> {
+    const apiKey = getFraudApiKey();
+    if (!apiKey) {
+        return [];
+    }
+    const response = await fetch(new Request(getFraudProjectUrl(), {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${apiKey}` },
+    }));
+    if (!response.ok) {
+        if (isFraudAuthFailure(response.status)) {
+            return [];
+        }
+        throw new Error(`Failed to fetch fraud projects: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return Array.isArray(data?.projects) ? data.projects : [];
+}
+
+/**
+ * Apply a final fraud outcome to the Project record behind a submission.
+ * Idempotent: a project already in the target status is left untouched and its
+ * stored rejection history is returned unchanged. The Project status is computed
+ * from the Submission, so approveProject/rejectProject write the Submission.
+ */
+async function applyOutcomeToSubmission(
+    submissionUserId: string,
+    submissionJourneyNumber: number,
+    status: "approved" | "rejected",
+    reason: string = ""
+): Promise<{ status: string; rejectionReason: string | null }> {
+    return new Promise<{ status: string; rejectionReason: string | null }>((resolve, reject) => {
+        base("Projects").select({
+            filterByFormula: `{journeyNumber} = ${submissionJourneyNumber}`
+        }).firstPage((projectErr: any, projectRecords: ReadonlyArray<AirtableRecord<AirtableFieldSet>> = []) => {
+            if (projectErr) {
+                reject(projectErr);
+                return;
+            }
+
+            const projectRecord = projectRecords.find((r) => {
+                const users = r.get("user") as string[] | undefined;
+                return Array.isArray(users) && users.includes(submissionUserId);
+            });
+            if (!projectRecord) {
+                resolve({ status: "pending", rejectionReason: null });
+                return;
+            }
+
+            // Already synced — hand back the stored history rather than re-recording the reason.
+            const currentProjectStatus = projectRecord.get("status") as string | undefined;
+            if (currentProjectStatus === status) {
+                const stored = (projectRecord.get("rejectionReason") as string | undefined) || null;
+                resolve({ status, rejectionReason: status === "rejected" ? stored : null });
+                return;
+            }
+
+            if (status === "approved") {
+                approveProject(projectRecord.id)
+                    .then(() => {
+                        clearCache();
+                        resolve({ status, rejectionReason: null });
+                    })
+                    .catch(reject);
+                return;
+            }
+
+            rejectProject(projectRecord.id, reason)
+                .then((history) => {
+                    clearCache();
+                    resolve({ status, rejectionReason: history });
+                })
+                .catch(reject);
+        });
+    });
+}
+
+/**
+ * Reconcile one project's outcome from a fraud "outcome.set" webhook.
+ * The webhook only carries Joe's project id, so we look the project up in the fraud
+ * API to recover our organizerPlatformId (the Submissions record id) and the
+ * authoritative outcome, then apply it. Idempotent via applyOutcomeToSubmission, so
+ * a duplicate delivery (or a later reconciling poll) is a no-op. Returns whether a
+ * matching local project was found and the resulting status.
+ */
+export async function reconcileFraudOutcome(joeProjectId: string): Promise<{ matched: boolean; status: string }> {
+    if (!joeProjectId) {
+        return { matched: false, status: "pending" };
+    }
+
+    const projects = await fetchFraudProjects();
+    const project = projects.find((item: any) => item?.id === joeProjectId);
+    if (!project) {
+        return { matched: false, status: "pending" };
+    }
+
+    const submissionId = typeof project.organizerPlatformId === "string" ? project.organizerPlatformId : "";
+    if (!submissionId) {
+        return { matched: false, status: "pending" };
+    }
+
+    const submissionRecord = await findSubmissionRecord(submissionId);
+    if (!submissionRecord) {
+        return { matched: false, status: "pending" };
+    }
+
+    const submissionUserId = getFirstOrDefault(submissionRecord.get("User"));
+    const submissionJourneyNumber = submissionRecord.get("journeyNumber") as number | undefined;
+    if (!submissionUserId || !submissionJourneyNumber) {
+        return { matched: false, status: "pending" };
+    }
+
+    const outcomeStatus = project.outcome?.status || project.status || "pending";
+    if (outcomeStatus === "approved") {
+        const result = await applyOutcomeToSubmission(submissionUserId, submissionJourneyNumber, "approved");
+        return { matched: true, status: result.status };
+    }
+    if (outcomeStatus === "rejected") {
+        const rejectionReason = typeof project.outcome?.reason === "string" && project.outcome.reason
+            ? project.outcome.reason
+            : "Your project was rejected.";
+        const result = await applyOutcomeToSubmission(submissionUserId, submissionJourneyNumber, "rejected", rejectionReason);
+        return { matched: true, status: result.status };
+    }
+
+    return { matched: true, status: String(outcomeStatus) };
+}
+
 export async function checkFraudStatus(submissionId: string): Promise<{ status: string; rejectionReason: string | null }> {
     return new Promise<{ status: string; rejectionReason: string | null }>((resolve, reject) => {
         findSubmissionRecord(submissionId).then((record) => {
@@ -2008,48 +2141,9 @@ export async function checkFraudStatus(submissionId: string): Promise<{ status: 
             }
 
             const updateMatchedProject = (status: "approved" | "rejected", reason: string = "") => {
-                base("Projects").select({
-                    filterByFormula: `{journeyNumber} = ${submissionJourneyNumber}`
-                }).firstPage((projectErr, projectRecords: ReadonlyArray<AirtableRecord<AirtableFieldSet>> = []) => {
-                    if (projectErr) {
-                        reject(projectErr);
-                        return;
-                    }
-
-                    const projectRecord = projectRecords.find((r) => {
-                        const users = r.get("user") as string[] | undefined;
-                        return Array.isArray(users) && users.includes(submissionUserId);
-                    });
-                    if (!projectRecord) {
-                        resolve({ status: "pending", rejectionReason: null });
-                        return;
-                    }
-
-                    // Already synced — hand back the stored history rather than re-recording the reason.
-                    const currentProjectStatus = projectRecord.get("status") as string | undefined;
-                    if (currentProjectStatus === status) {
-                        const stored = (projectRecord.get("rejectionReason") as string | undefined) || null;
-                        resolve({ status, rejectionReason: status === "rejected" ? stored : null });
-                        return;
-                    }
-
-                    if (status === "approved") {
-                        approveProject(projectRecord.id)
-                            .then(() => {
-                                clearCache();
-                                resolve({ status, rejectionReason: null });
-                            })
-                            .catch(reject);
-                        return;
-                    }
-
-                    rejectProject(projectRecord.id, reason)
-                        .then((history) => {
-                            clearCache();
-                            resolve({ status, rejectionReason: history });
-                        })
-                        .catch(reject);
-                });
+                applyOutcomeToSubmission(submissionUserId, submissionJourneyNumber, status, reason)
+                    .then((result) => resolve(result))
+                    .catch(reject);
             };
 
             const request = new Request(getFraudProjectUrl(), {
