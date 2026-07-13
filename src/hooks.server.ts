@@ -50,7 +50,9 @@ export const handle: Handle = async ({ event, resolve }) => {
         event.url.pathname.startsWith('/api/') &&
         event.url.pathname !== '/api/login' &&
         !event.url.pathname.startsWith('/api/login/') &&
-        !event.url.pathname.startsWith('/api/uploadthing')
+        !event.url.pathname.startsWith('/api/uploadthing') &&
+        // The fraud webhook authenticates itself via the secret in its path; Joe has no Slack session.
+        !event.url.pathname.startsWith('/api/fraud/webhook')
     ) {
         if (!slackId) {
             return new Response('Not loggedin', { status: 401 });
