@@ -8,7 +8,11 @@
       let isLoading = $derived(false);
 
       const normalizedStatus = (project) => String(project?.status || '').trim().toUpperCase();
-      const isApproved = (project) => normalizedStatus(project) === 'APPROVED';
+      // A fraud-review project counts as approved for unlocking the next-but-one journey.
+      const countsAsApproved = (project) => {
+        const status = normalizedStatus(project);
+        return status === 'APPROVED' || status === 'FRAUD-REVIEW';
+      };
 
       const isCreateable = (journeyNum) => {
             if (projects[journeyNum]?.length) return false;
@@ -19,7 +23,7 @@
             if (!prevJourneySubmitted) return false;
 
             if (journeyNum > 2) {
-              const twoBackApproved = projects[journeyNum - 2]?.some((project) => isApproved(project));
+              const twoBackApproved = projects[journeyNum - 2]?.some((project) => countsAsApproved(project));
                   if (!twoBackApproved) return false;
             }
 

@@ -1,7 +1,14 @@
 import { createProject, getSlackId, getProjects } from "$lib/db/airtableClient";
 import { clearCacheKey } from "$lib/server/projectsCache";
 
-const isApproved = (project: any) => String(project?.status || '').trim().toUpperCase() === 'APPROVED';
+// A project unlocks the next-but-one journey once it has cleared human review — that
+// includes projects still in fraud-review (reviewer approved, awaiting Joe's final
+// outcome). Eligibility is only checked at creation, so if a fraud-review project is
+// later rejected the already-created next project stays.
+const countsAsApproved = (project: any) => {
+    const status = String(project?.status || '').trim().toUpperCase();
+    return status === 'APPROVED' || status === 'FRAUD-REVIEW';
+};
 
 const isCreateable = (journeyNum: number, projectsByJourney: Record<number, any[]>): boolean => {
     if (projectsByJourney[journeyNum]?.length) return false;
@@ -12,7 +19,7 @@ const isCreateable = (journeyNum: number, projectsByJourney: Record<number, any[
     if (!prevJourneySubmitted) return false;
 
     if (journeyNum > 2) {
-        const twoBackApproved = projectsByJourney[journeyNum - 2]?.some((project: any) => isApproved(project));
+        const twoBackApproved = projectsByJourney[journeyNum - 2]?.some((project: any) => countsAsApproved(project));
         if (!twoBackApproved) return false;
     }
 

@@ -23,7 +23,11 @@ export async function load({ fetch, params }) {
       newProjects[p.journeyNumber].push(p);
     });
 
-    const isApproved = (project) => String(project?.status || '').trim().toUpperCase() === 'APPROVED';
+    // A fraud-review project counts as approved for unlocking the next-but-one journey.
+    const countsAsApproved = (project) => {
+      const status = String(project?.status || '').trim().toUpperCase();
+      return status === 'APPROVED' || status === 'FRAUD-REVIEW';
+    };
     
     const isCreateable = (journeyNum) => {
       if (newProjects[journeyNum]?.length) return false;
@@ -33,7 +37,7 @@ export async function load({ fetch, params }) {
       if (!prevJourneySubmitted) return false;
       
       if (journeyNum > 2) {
-        const twoBackApproved = newProjects[journeyNum - 2]?.some((project) => isApproved(project));
+        const twoBackApproved = newProjects[journeyNum - 2]?.some((project) => countsAsApproved(project));
         if (!twoBackApproved) return false;
       }
       
@@ -52,7 +56,7 @@ export async function load({ fetch, params }) {
         }
         
         if (journeyNum > 2) {
-          const twoBackApproved = newProjects[journeyNum - 2]?.some((project) => isApproved(project));
+          const twoBackApproved = newProjects[journeyNum - 2]?.some((project) => countsAsApproved(project));
           if (!twoBackApproved) {
             return `Journey ${journeyNum - 2} must be APPROVED before you can create for Journey ${journeyNum}!`;
           }
