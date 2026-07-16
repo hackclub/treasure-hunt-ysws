@@ -1330,6 +1330,24 @@ export async function getSubmissionForJourney(slackId: string, journeyNumber: nu
     });
 }
 
+/** Whether the user has already been recorded as completing the journey — used as the "rewards already granted" marker. */
+export async function isJourneyCompleter(journeyId: number, userRecordId: string): Promise<boolean> {
+    const recordId = await journeyIdToRecordId(journeyId);
+    if (!recordId) {
+        throw new Error("Journey not found");
+    }
+    return new Promise((resolve, reject) => {
+        base("Journeys").find(recordId, (error: any, record?: AirtableRecord<AirtableFieldSet>) => {
+            if (error || !record) {
+                reject(error ?? new Error("Journey not found"));
+                return;
+            }
+            const completers = (record.get("completers") as string[]) || [];
+            resolve(completers.includes(userRecordId));
+        });
+    });
+}
+
 export async function addToCompleters(journeyId: number, userRecordId: string): Promise<void> {
     const recordId = await journeyIdToRecordId(journeyId);
     if (!recordId) {
@@ -2040,8 +2058,13 @@ async function applyOutcomeToSubmission(
             }
 
             // Already synced — hand back the stored history rather than re-recording the reason.
-            const currentProjectStatus = projectRecord.get("status") as string | undefined;
-            if (currentProjectStatus === status) {
+            // Projects.status is a lookup field, so Airtable returns it as an array
+            // (e.g. ['approved']); a strict string compare would never match and every
+            // poll would re-run the approval — re-granting orders and gold bars each time.
+            const rawStatus = projectRecord.get("status");
+            const statusValues = (Array.isArray(rawStatus) ? rawStatus : [rawStatus]).map((s) => normalizeStatus(s));
+            if (statusValues.includes(status)) {
+                console.log(`[payout] Fraud outcome '${status}' for journey ${submissionJourneyNumber} project ${projectRecord.id} already applied — skipping`);
                 const stored = (projectRecord.get("rejectionReason") as string | undefined) || null;
                 resolve({ status, rejectionReason: status === "rejected" ? stored : null });
                 return;
@@ -2225,6 +2248,7 @@ async function approveProject(projectId: string): Promise<void> {
                     return userRecordIdToSlackId(userRecordId)
                         .then((slackId) => {
                             if (!slackId) return;
+                            console.log(`[payout] Project approved via fraud sync — triggering journey ${journeyNumber} rewards for ${slackId}`);
                             return completeJourney(slackId, journeyNumber).then(() => {
                                 sendUpdateDM(slackId, "Project Approved!", `Your Journey ${journeyNumber} project has been approved! Your prize is on the way.`).catch(err => {
                                     console.error("Error sending approval DM:", err);

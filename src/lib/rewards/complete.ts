@@ -1,6 +1,24 @@
-import { getJourneyById, userSlackIdToUserRecord, addToCompleters, updateJourneyNumber, getActiveExpedition, createOrder, getSubmissionForJourney, getGoldBars, updateGoldBars } from "$lib/db/airtableClient";
+import { getJourneyById, userSlackIdToUserRecord, addToCompleters, isJourneyCompleter, updateJourneyNumber, getActiveExpedition, createOrder, getSubmissionForJourney, getGoldBars, updateGoldBars } from "$lib/db/airtableClient";
+
+// Guards against two concurrent requests granting the same journey twice before the
+// completers marker lands (e.g. overlapping projects-page polls in flight together).
+const inFlightGrants = new Set<string>();
 
 export async function completeJourney(slackId: string, journeyNumber: number) {
+    const grantKey = `${slackId}:${journeyNumber}`;
+    if (inFlightGrants.has(grantKey)) {
+        console.warn(`[payout] Skipped grant for ${grantKey}: another grant for it is already in flight`);
+        return;
+    }
+    inFlightGrants.add(grantKey);
+    try {
+        await completeJourneyInner(slackId, journeyNumber);
+    } finally {
+        inFlightGrants.delete(grantKey);
+    }
+}
+
+async function completeJourneyInner(slackId: string, journeyNumber: number) {
     const journey = await getJourneyById(journeyNumber);
 
     if (!journey) {
@@ -11,6 +29,15 @@ export async function completeJourney(slackId: string, journeyNumber: number) {
     if (!userRecord) {
         throw new Error(`User with slackId ${slackId} not found`);
     }
+
+    // Rewards must only ever be granted once per (user, journey). The completers list
+    // is the durable marker: if the user is already on it, everything below has run.
+    if (await isJourneyCompleter(journeyNumber, userRecord.id)) {
+        console.log(`[payout] Skipped grant for ${slackId}:${journeyNumber}: already a completer, rewards were granted before`);
+        return;
+    }
+
+    console.log(`[payout] Granting journey ${journeyNumber} rewards to ${slackId}`);
 
     const currentJourneyNumber = Number(userRecord.get("journeyNumber") ?? 0);
     const nextJourneyNumber = Math.max(currentJourneyNumber, journeyNumber + 1);
@@ -78,6 +105,7 @@ export async function completeJourney(slackId: string, journeyNumber: number) {
                     status: "pending" as const
                 };
         await createOrder(order);
+        console.log(`[payout] Created day-prize order (item ${itemId}) for ${slackId}, journey ${journeyNumber}`);
     }
     // fullfill hardware
     if (activeExpedition == 'hardware') {
@@ -120,6 +148,7 @@ export async function completeJourney(slackId: string, journeyNumber: number) {
                     status: "pending" as const
                 };
         await createOrder(order);
+        console.log(`[payout] Created day-prize order (item ${itemId}) for ${slackId}, journey ${journeyNumber}`);
     }
 
     // add gold bars for completing the journey, 10 goldbars per hour after the fourth hour
@@ -132,15 +161,20 @@ export async function completeJourney(slackId: string, journeyNumber: number) {
             const goldToAdd = extraHours * rate;
             const currentGold = await getGoldBars(undefined, slackId);
             await updateGoldBars(slackId, (currentGold || 0) + goldToAdd);
+            console.log(`[payout] Awarded ${goldToAdd} gold bars to ${slackId} for journey ${journeyNumber} (${hoursSpent}h override, ${extraHours} extra hours, ${currentGold || 0} -> ${(currentGold || 0) + goldToAdd})`);
+        } else {
+            console.log(`[payout] No gold bars for ${slackId}, journey ${journeyNumber} (${hoursSpent}h override, nothing past the 4h base)`);
         }
     } catch (err) {
         console.error("Error awarding gold bars:", err);
     }
 
     await addToCompleters(journeyNumber, userRecord.id);
+    console.log(`[payout] Marked ${slackId} as completer of journey ${journeyNumber}`);
     // 3.5. Bump journeyNumber only forward, never backwards when backfilling older journeys
     if (nextJourneyNumber > currentJourneyNumber) {
         await updateJourneyNumber(slackId, nextJourneyNumber);
+        console.log(`[payout] Bumped ${slackId} journeyNumber ${currentJourneyNumber} -> ${nextJourneyNumber}`);
     }
     // ~4. once project approved add them the goldbars and send them the order - do in review workflow~
     // 5. dm them about there project wen't into review
