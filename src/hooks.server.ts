@@ -31,17 +31,14 @@ export const handle: Handle = async ({ event, resolve }) => {
                     const newRefreshToken = refreshData.refresh_token;
                     event.request.headers.set('cookie', `access_token=${newAccessToken}; refresh_token=${newRefreshToken}`);
                     slackId = await getSlackId(event.request);
-                    const response = await resolve(event);
-                    response.headers.append('set-cookie', `access_token=${newAccessToken}; Path=/; HttpOnly; SameSite=Lax`);
-                    response.headers.append('set-cookie', `refresh_token=${newRefreshToken}; Path=/; HttpOnly; SameSite=Lax`);
-                    return response;
+                    const cookieOpts = { path: '/', httpOnly: true, sameSite: 'lax' as const };
+                    event.cookies.set('access_token', newAccessToken, cookieOpts);
+                    event.cookies.set('refresh_token', newRefreshToken, cookieOpts);
                 } else {
                     console.error("Error refreshing access token:", await refreshResponse.text());
-                    return new Response("Error refreshing access token", { status: 500 });
                 }
             } catch (error) {
                 console.error("Error refreshing access token:", error);
-                return new Response("Error refreshing access token", { status: 500 });
             }
         }
     }
