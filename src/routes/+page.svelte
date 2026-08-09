@@ -205,7 +205,7 @@
                 ]}
                 links={[
                     { text: "Slack: @peleg2210", url: "https://hackclub.slack.com/team/U091DE0M4NB" },
-                    { text: "Email: peleg@peleg2210.me", url: "mailto:peleg@peleg2210.me" }
+                    { text: "Email me", url: "mailto:peleg@peleg2210.me" }
                 ]}
                 />
             </div>
